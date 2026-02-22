@@ -1,4 +1,4 @@
-package com.k12.user.domain.model.specialization.parent;
+package com.k12.user.domain.models.specialization.parent;
 
 /**
  * Parent status enum.

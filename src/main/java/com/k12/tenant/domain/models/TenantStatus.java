@@ -1,4 +1,4 @@
-package com.k12.tenant.domain.model;
+package com.k12.tenant.domain.models;
 
 /**
  * Tenant status enum.

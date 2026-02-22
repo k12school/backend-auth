@@ -1,9 +1,9 @@
-package com.k12.tenant.domain.model.events;
+package com.k12.tenant.domain.models.events;
 
 import com.k12.common.domain.model.TenantId;
-import com.k12.tenant.domain.model.Subdomain;
-import com.k12.tenant.domain.model.TenantName;
-import com.k12.tenant.domain.model.TenantStatus;
+import com.k12.tenant.domain.models.Subdomain;
+import com.k12.tenant.domain.models.TenantName;
+import com.k12.tenant.domain.models.TenantStatus;
 import java.time.Instant;
 
 /**

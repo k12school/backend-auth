@@ -1,4 +1,4 @@
-package com.k12.user.domain.model.specialization.student;
+package com.k12.user.domain.models.specialization.student;
 
 import com.k12.common.domain.model.StudentId;
 import java.time.Instant;

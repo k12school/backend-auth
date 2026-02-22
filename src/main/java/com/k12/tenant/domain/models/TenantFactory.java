@@ -1,13 +1,13 @@
-package com.k12.tenant.domain.model;
+package com.k12.tenant.domain.models;
 
-import static com.k12.tenant.domain.model.error.TenantError.NameError.NAME_EMPTY;
-import static com.k12.tenant.domain.model.error.TenantError.SubdomainError.SUBDOMAIN_INVALID_FORMAT;
+import static com.k12.tenant.domain.models.error.TenantError.NameError.NAME_EMPTY;
+import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_INVALID_FORMAT;
 
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.TenantId;
-import com.k12.tenant.domain.model.commands.TenantCommands.CreateTenant;
-import com.k12.tenant.domain.model.error.TenantError;
-import com.k12.tenant.domain.model.events.TenantEvents;
+import com.k12.tenant.domain.models.commands.TenantCommands.CreateTenant;
+import com.k12.tenant.domain.models.error.TenantError;
+import com.k12.tenant.domain.models.events.TenantEvents;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

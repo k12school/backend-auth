@@ -1,10 +1,10 @@
-package com.k12.user.domain.model.commands;
+package com.k12.user.domain.models.commands;
 
 import com.k12.common.domain.model.UserId;
-import com.k12.user.domain.model.EmailAddress;
-import com.k12.user.domain.model.PasswordHash;
-import com.k12.user.domain.model.UserName;
-import com.k12.user.domain.model.UserRole;
+import com.k12.user.domain.models.EmailAddress;
+import com.k12.user.domain.models.PasswordHash;
+import com.k12.user.domain.models.UserName;
+import com.k12.user.domain.models.UserRole;
 import java.util.Set;
 
 /**

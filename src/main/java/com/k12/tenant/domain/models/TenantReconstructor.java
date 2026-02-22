@@ -1,9 +1,9 @@
-package com.k12.tenant.domain.model;
+package com.k12.tenant.domain.models;
 
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.TenantId;
-import com.k12.tenant.domain.model.error.TenantError;
-import com.k12.tenant.domain.model.events.TenantEvents;
+import com.k12.tenant.domain.models.error.TenantError;
+import com.k12.tenant.domain.models.events.TenantEvents;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;

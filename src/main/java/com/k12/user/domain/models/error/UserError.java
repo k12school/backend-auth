@@ -1,4 +1,4 @@
-package com.k12.user.domain.model.error;
+package com.k12.user.domain.models.error;
 
 /**
  * Base interface for all user-related errors.

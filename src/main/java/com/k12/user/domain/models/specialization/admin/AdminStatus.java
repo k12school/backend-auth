@@ -1,4 +1,4 @@
-package com.k12.user.domain.model.specialization.admin;
+package com.k12.user.domain.models.specialization.admin;
 
 /**
  * Admin status enum.

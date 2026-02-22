@@ -1,27 +1,27 @@
-package com.k12.tenant.domain.model;
+package com.k12.tenant.domain.models;
 
-import static com.k12.tenant.domain.model.error.TenantError.NameError.NAME_SAME_AS_CURRENT;
-import static com.k12.tenant.domain.model.error.TenantError.SubdomainError.SUBDOMAIN_SAME_AS_CURRENT;
-import static com.k12.tenant.domain.model.error.TenantError.TenantStatusError.CANNOT_ACTIVATE_INACTIVE;
-import static com.k12.tenant.domain.model.error.TenantError.TenantStatusError.TENANT_ALREADY_ACTIVE;
-import static com.k12.tenant.domain.model.error.TenantError.TenantStatusError.TENANT_ALREADY_INACTIVE;
-import static com.k12.tenant.domain.model.error.TenantError.TenantStatusError.TENANT_ALREADY_SUSPENDED;
+import static com.k12.tenant.domain.models.error.TenantError.NameError.NAME_SAME_AS_CURRENT;
+import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_SAME_AS_CURRENT;
+import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.CANNOT_ACTIVATE_INACTIVE;
+import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.TENANT_ALREADY_ACTIVE;
+import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.TENANT_ALREADY_INACTIVE;
+import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.TENANT_ALREADY_SUSPENDED;
 import static java.time.Instant.now;
 
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.TenantId;
-import com.k12.tenant.domain.model.commands.TenantCommands;
-import com.k12.tenant.domain.model.commands.TenantCommands.ActivateTenant;
-import com.k12.tenant.domain.model.commands.TenantCommands.DeactivateTenant;
-import com.k12.tenant.domain.model.commands.TenantCommands.SuspendTenant;
-import com.k12.tenant.domain.model.commands.TenantCommands.UpdateName;
-import com.k12.tenant.domain.model.commands.TenantCommands.UpdateSubdomain;
-import com.k12.tenant.domain.model.error.TenantError;
-import com.k12.tenant.domain.model.events.TenantEvents;
-import com.k12.tenant.domain.model.events.TenantEvents.TenantActivated;
-import com.k12.tenant.domain.model.events.TenantEvents.TenantNameUpdated;
-import com.k12.tenant.domain.model.events.TenantEvents.TenantSubdomainUpdated;
-import com.k12.tenant.domain.model.events.TenantEvents.TenantSuspended;
+import com.k12.tenant.domain.models.commands.TenantCommands;
+import com.k12.tenant.domain.models.commands.TenantCommands.ActivateTenant;
+import com.k12.tenant.domain.models.commands.TenantCommands.DeactivateTenant;
+import com.k12.tenant.domain.models.commands.TenantCommands.SuspendTenant;
+import com.k12.tenant.domain.models.commands.TenantCommands.UpdateName;
+import com.k12.tenant.domain.models.commands.TenantCommands.UpdateSubdomain;
+import com.k12.tenant.domain.models.error.TenantError;
+import com.k12.tenant.domain.models.events.TenantEvents;
+import com.k12.tenant.domain.models.events.TenantEvents.TenantActivated;
+import com.k12.tenant.domain.models.events.TenantEvents.TenantNameUpdated;
+import com.k12.tenant.domain.models.events.TenantEvents.TenantSubdomainUpdated;
+import com.k12.tenant.domain.models.events.TenantEvents.TenantSuspended;
 import lombok.With;
 
 public record Tenant(

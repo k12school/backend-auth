@@ -1,16 +1,16 @@
-package com.k12.domain.ports.out;
+package com.k12.user.domain.ports.out;
 
-import com.k12.domain.model.common.UserId;
-import com.k12.domain.model.specialization.admin.Admin;
-import com.k12.domain.model.specialization.admin.AdminId;
-import com.k12.domain.model.specialization.admin.AdminStatus;
+import com.k12.common.domain.model.UserId;
+import com.k12.user.domain.models.specialization.admin.Admin;
+import com.k12.user.domain.models.specialization.admin.AdminId;
+import com.k12.user.domain.models.specialization.admin.AdminStatus;
 import java.util.Optional;
 import java.util.Set;
 
 /**
  * Repository interface for Admin aggregates.
  */
-public interface AdminRepository {
+public interface    AdminRepository {
 
     /**
      * Saves an admin aggregate.

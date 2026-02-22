@@ -1,9 +1,9 @@
-package com.k12.user.domain.model;
+package com.k12.user.domain.models;
 
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.UserId;
-import com.k12.user.domain.model.error.UserError;
-import com.k12.user.domain.model.events.UserEvents;
+import com.k12.user.domain.models.error.UserError;
+import com.k12.user.domain.models.events.UserEvents;
 import java.util.HashSet;
 import java.util.List;
 import lombok.AccessLevel;

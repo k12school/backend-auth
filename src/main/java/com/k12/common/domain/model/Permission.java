@@ -1,4 +1,4 @@
-package com.k12.domain.model.authorization;
+package com.k12.common.domain.model;
 
 /**
  * Represents individual permissions in the system.

@@ -1,5 +1,10 @@
 # Getting Started Guide
 
+> **Note:** This guide uses the **User** bounded context as a concrete example to illustrate patterns.
+> The concepts, principles, and code patterns apply universally to any bounded context.
+> Replace `User` with your entity (e.g., `Product`, `Order`, `Course`, `Invoice`) and
+> `UserId` with your ID type — the architecture remains the same.
+
 This guide will help you understand and start using the Domain-Centric Architecture for Java backend applications.
 
 ## What is Domain-Centric Architecture?

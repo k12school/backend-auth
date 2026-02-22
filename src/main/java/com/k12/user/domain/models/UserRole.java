@@ -1,4 +1,4 @@
-package com.k12.user.domain.model;
+package com.k12.user.domain.models;
 
 public enum UserRole {
     SUPER_ADMIN,

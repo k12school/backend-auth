@@ -1,7 +1,7 @@
-package com.k12.domain.ports.out;
+package com.k12.user.domain.ports.out;
 
-import com.k12.domain.model.common.UserId;
-import com.k12.domain.model.user.User;
+import com.k12.common.domain.model.UserId;
+import com.k12.user.domain.models.User;
 import java.util.Optional;
 
 /**

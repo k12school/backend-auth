@@ -1,15 +1,15 @@
-package com.k12.user.domain.model;
+package com.k12.user.domain.models;
 
-import static com.k12.user.domain.model.error.UserError.EmailError.EMAIL_INVALID_FORMAT;
-import static com.k12.user.domain.model.error.UserError.NameError.NAME_EMPTY;
-import static com.k12.user.domain.model.error.UserError.PasswordError.PASSWORD_HASH_INVALID;
-import static com.k12.user.domain.model.error.UserError.RoleError.ROLES_CANNOT_BE_EMPTY;
+import static com.k12.user.domain.models.error.UserError.EmailError.EMAIL_INVALID_FORMAT;
+import static com.k12.user.domain.models.error.UserError.NameError.NAME_EMPTY;
+import static com.k12.user.domain.models.error.UserError.PasswordError.PASSWORD_HASH_INVALID;
+import static com.k12.user.domain.models.error.UserError.RoleError.ROLES_CANNOT_BE_EMPTY;
 
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.UserId;
-import com.k12.user.domain.model.commands.UserCommands.CreateUser;
-import com.k12.user.domain.model.error.UserError;
-import com.k12.user.domain.model.events.UserEvents;
+import com.k12.user.domain.models.commands.UserCommands.CreateUser;
+import com.k12.user.domain.models.error.UserError;
+import com.k12.user.domain.models.events.UserEvents;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;

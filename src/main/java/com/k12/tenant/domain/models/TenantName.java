@@ -1,4 +1,4 @@
-package com.k12.tenant.domain.model;
+package com.k12.tenant.domain.models;
 
 /**
  * Value object representing a tenant's name.

@@ -1,4 +1,4 @@
-package com.k12.domain.model.common;
+package com.k12.common.domain.model;
 
 /**
  * Value object representing a unique identifier for a Student.

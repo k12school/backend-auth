@@ -1,4 +1,4 @@
-package com.k12.user.domain.model;
+package com.k12.user.domain.models;
 
 import java.util.regex.Pattern;
 

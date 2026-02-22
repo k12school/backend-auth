@@ -1,4 +1,4 @@
-package com.k12.user.domain.model.specialization.admin.valueobjects;
+package com.k12.user.domain.models.specialization.admin.valueobjects;
 
 /**
  * Permission enum for Admin.

@@ -1,4 +1,4 @@
-package com.k12.domain.model.common;
+package com.k12.common.domain.model;
 
 /**
  * Railway Oriented Programming Result type.

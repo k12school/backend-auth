@@ -1,11 +1,11 @@
-package com.k12.domain.ports.out;
+package com.k12.user.domain.ports.out;
 
-import com.k12.domain.model.common.CourseId;
-import com.k12.domain.model.common.StudentId;
-import com.k12.domain.model.common.UserId;
-import com.k12.domain.model.specialization.student.GradeLevel;
-import com.k12.domain.model.specialization.student.Student;
-import com.k12.domain.model.specialization.student.StudentStatus;
+import com.k12.common.domain.model.CourseId;
+import com.k12.common.domain.model.StudentId;
+import com.k12.common.domain.model.UserId;
+import com.k12.user.domain.models.specialization.student.GradeLevel;
+import com.k12.user.domain.models.specialization.student.Student;
+import com.k12.user.domain.models.specialization.student.StudentStatus;
 import java.util.Optional;
 import java.util.Set;
 

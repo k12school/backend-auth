@@ -1,9 +1,9 @@
-package com.k12.domain.ports.out;
+package com.k12.user.domain.ports.out;
 
-import com.k12.domain.model.common.CourseId;
-import com.k12.domain.model.common.UserId;
-import com.k12.domain.model.specialization.teacher.Teacher;
-import com.k12.domain.model.specialization.teacher.TeacherId;
+import com.k12.common.domain.model.CourseId;
+import com.k12.common.domain.model.UserId;
+import com.k12.user.domain.models.specialization.teacher.Teacher;
+import com.k12.user.domain.models.specialization.teacher.TeacherId;
 import java.util.Optional;
 import java.util.Set;
 

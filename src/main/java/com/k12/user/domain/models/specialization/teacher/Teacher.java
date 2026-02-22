@@ -1,4 +1,4 @@
-package com.k12.user.domain.model.specialization.teacher;
+package com.k12.user.domain.models.specialization.teacher;
 
 import java.time.Instant;
 

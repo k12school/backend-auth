@@ -1,8 +1,8 @@
-package com.k12.tenant.domain.model.commands;
+package com.k12.tenant.domain.models.commands;
 
 import com.k12.common.domain.model.TenantId;
-import com.k12.tenant.domain.model.Subdomain;
-import com.k12.tenant.domain.model.TenantName;
+import com.k12.tenant.domain.models.Subdomain;
+import com.k12.tenant.domain.models.TenantName;
 
 /**
  * Sealed interface representing all possible tenant commands.

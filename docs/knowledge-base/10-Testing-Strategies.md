@@ -1,5 +1,10 @@
 # Testing Strategies
 
+> **Note:** This guide uses the **User** bounded context as a concrete example to illustrate patterns.
+> The concepts, principles, and code patterns apply universally to any bounded context.
+> Replace `User` with your entity (e.g., `Product`, `Order`, `Course`, `Invoice`) and
+> `UserId` with your ID type — the architecture remains the same.
+
 Comprehensive guide to testing applications built with Domain-Centric Architecture.
 
 ## Testing Philosophy

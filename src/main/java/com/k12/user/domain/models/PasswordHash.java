@@ -1,4 +1,4 @@
-package com.k12.user.domain.model;
+package com.k12.user.domain.models;
 
 /**
  * Password hash value object.
