@@ -4,6 +4,7 @@ import com.k12.common.domain.model.TenantId;
 import com.k12.tenant.application.service.TenantService;
 import com.k12.tenant.domain.models.events.TenantEvents;
 import com.k12.tenant.infrastructure.rest.dto.CreateTenantRequest;
+import com.k12.tenant.infrastructure.rest.dto.ErrorResponse;
 import com.k12.tenant.infrastructure.rest.dto.TenantResponse;
 import com.k12.tenant.infrastructure.rest.mapper.ErrorResponseMapper;
 import jakarta.validation.Valid;
@@ -11,6 +12,13 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 @Path("/api/tenants")
 @Produces(MediaType.APPLICATION_JSON)
@@ -25,19 +33,19 @@ public class TenantResource {
     @Operation(
             summary = "Create a new tenant",
             description = "Creates a new tenant with the provided name and subdomain")
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "201",
-                    description = "Tenant created successfully",
-                    content = @Content(schema = @Schema(implementation = TenantResource.TenantEventDTO.class))),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid request data",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class))),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Tenant with the same subdomain already exists",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class)))
+    @APIResponses({
+        @APIResponse(
+                responseCode = "201",
+                description = "Tenant created successfully",
+                content = @Content(schema = @Schema(implementation = TenantResource.TenantEventDTO.class))),
+        @APIResponse(
+                responseCode = "400",
+                description = "Invalid request data",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @APIResponse(
+                responseCode = "409",
+                description = "Tenant with the same subdomain already exists",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     })
     public Response createTenant(
             @Parameter(description = "Tenant creation request", required = true) @Valid CreateTenantRequest request) {
@@ -48,21 +56,21 @@ public class TenantResource {
 
     @GET
     @Path("/{id}")
-    @Operation(
-            summary = "Get tenant by ID",
-            description = "Retrieves a tenant by its unique identifier")
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Tenant found",
-                    content = @Content(schema = @Schema(implementation = TenantResponse.class))),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Tenant not found",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class)))
+    @Operation(summary = "Get tenant by ID", description = "Retrieves a tenant by its unique identifier")
+    @APIResponses({
+        @APIResponse(
+                responseCode = "200",
+                description = "Tenant found",
+                content = @Content(schema = @Schema(implementation = TenantResponse.class))),
+        @APIResponse(
+                responseCode = "404",
+                description = "Tenant not found",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     })
     public Response getTenant(
-            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000") @PathParam("id") String id) {
+            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000")
+                    @PathParam("id")
+                    String id) {
 
         TenantId tenantId = new TenantId(id);
         var result = tenantService.getTenant(tenantId);
@@ -75,22 +83,24 @@ public class TenantResource {
     @Operation(
             summary = "Activate a tenant",
             description = "Activates a tenant with the given ID, changing its status to ACTIVE")
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Tenant activated successfully",
-                    content = @Content(schema = @Schema(implementation = TenantResource.TenantEventDTO.class))),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Tenant not found",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class))),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Tenant cannot be activated (invalid state transition)",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class)))
+    @APIResponses({
+        @APIResponse(
+                responseCode = "200",
+                description = "Tenant activated successfully",
+                content = @Content(schema = @Schema(implementation = TenantResource.TenantEventDTO.class))),
+        @APIResponse(
+                responseCode = "404",
+                description = "Tenant not found",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @APIResponse(
+                responseCode = "400",
+                description = "Tenant cannot be activated (invalid state transition)",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     })
     public Response activateTenant(
-            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000") @PathParam("id") String id) {
+            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000")
+                    @PathParam("id")
+                    String id) {
 
         TenantId tenantId = new TenantId(id);
         var result = tenantService.activateTenant(tenantId);
@@ -102,22 +112,24 @@ public class TenantResource {
     @Operation(
             summary = "Suspend a tenant",
             description = "Suspends a tenant with the given ID, changing its status to SUSPENDED")
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Tenant suspended successfully",
-                    content = @Content(schema = @Schema(implementation = TenantResource.TenantEventDTO.class))),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Tenant not found",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class))),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Tenant cannot be suspended (invalid state transition)",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class)))
+    @APIResponses({
+        @APIResponse(
+                responseCode = "200",
+                description = "Tenant suspended successfully",
+                content = @Content(schema = @Schema(implementation = TenantResource.TenantEventDTO.class))),
+        @APIResponse(
+                responseCode = "404",
+                description = "Tenant not found",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @APIResponse(
+                responseCode = "400",
+                description = "Tenant cannot be suspended (invalid state transition)",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     })
     public Response suspendTenant(
-            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000") @PathParam("id") String id) {
+            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000")
+                    @PathParam("id")
+                    String id) {
 
         TenantId tenantId = new TenantId(id);
         var result = tenantService.suspendTenant(tenantId);
@@ -126,24 +138,22 @@ public class TenantResource {
 
     @DELETE
     @Path("/{id}")
-    @Operation(
-            summary = "Delete a tenant",
-            description = "Deletes a tenant with the given ID")
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "204",
-                    description = "Tenant deleted successfully"),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Tenant not found",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class))),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Tenant cannot be deleted (invalid state transition)",
-                    content = @Content(schema = @Schema(implementation = com.k12.tenant.infrastructure.rest.dto.ErrorResponse.class)))
+    @Operation(summary = "Delete a tenant", description = "Deletes a tenant with the given ID")
+    @APIResponses({
+        @APIResponse(responseCode = "204", description = "Tenant deleted successfully"),
+        @APIResponse(
+                responseCode = "404",
+                description = "Tenant not found",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @APIResponse(
+                responseCode = "400",
+                description = "Tenant cannot be deleted (invalid state transition)",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     })
     public Response deleteTenant(
-            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000") @PathParam("id") String id) {
+            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000")
+                    @PathParam("id")
+                    String id) {
 
         TenantId tenantId = new TenantId(id);
         var result = tenantService.deleteTenant(tenantId);
@@ -200,9 +210,18 @@ public class TenantResource {
      */
     @Schema(description = "Tenant event response representing a state change")
     record TenantEventDTO(
-            @Schema(description = "Type of event that occurred", example = "TenantCreated") String eventType,
-            @Schema(description = "Unique identifier of the tenant", example = "123e4567-e89b-12d3-a456-426614174000") String tenantId,
-            @Schema(description = "Name of the tenant", example = "Acme Corporation") String name,
-            @Schema(description = "Subdomain of the tenant", example = "acme") String subdomain,
-            @Schema(description = "Current status of the tenant", example = "ACTIVE") String status) {}
+            @Schema(description = "Type of event that occurred", examples = "TenantCreated")
+            String eventType,
+
+            @Schema(description = "Unique identifier of the tenant", examples = "123e4567-e89b-12d3-a456-426614174000")
+            String tenantId,
+
+            @Schema(description = "Name of the tenant", examples = "Acme Corporation")
+            String name,
+
+            @Schema(description = "Subdomain of the tenant", examples = "acme")
+            String subdomain,
+
+            @Schema(description = "Current status of the tenant", examples = "ACTIVE")
+            String status) {}
 }
