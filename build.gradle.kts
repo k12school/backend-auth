@@ -50,6 +50,9 @@ dependencies {
     compileOnly("org.projectlombok:lombok:1.18.42")
     annotationProcessor("org.projectlombok:lombok:1.18.42")
 
+    // Kryo serialization
+    implementation("com.esotericsoftware:kryo:5.6.0")
+
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.2")
     testImplementation("org.assertj:assertj-core:3.27.7")

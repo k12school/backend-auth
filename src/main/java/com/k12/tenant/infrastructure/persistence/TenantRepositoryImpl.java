@@ -3,7 +3,6 @@ package com.k12.tenant.infrastructure.persistence;
 import static com.k12.tenant.domain.models.error.TenantError.ConcurrencyError.VERSION_CONFLICT;
 import static com.k12.tenant.domain.models.error.TenantError.PersistenceError.STORAGE_ERROR;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.TenantId;
 import com.k12.tenant.domain.models.Tenant;
@@ -33,7 +32,6 @@ import org.jooq.impl.DSL;
 public class TenantRepositoryImpl implements TenantRepository {
 
     private final AgroalDataSource dataSource;
-    private final ObjectMapper objectMapper;
 
     // Table and column names (jOOQ will generate these from schema)
     private static final String TENANT_EVENTS = "tenant_events";
@@ -56,8 +54,8 @@ public class TenantRepositoryImpl implements TenantRepository {
                 return Result.failure(VERSION_CONFLICT);
             }
 
-            // Serialize event to JSON
-            String eventData = objectMapper.writeValueAsString(event);
+            // Serialize event to binary using Kryo
+            byte[] eventData = KryoEventSerializer.serialize(event);
             String eventType = event.getClass().getSimpleName();
 
             // Insert event
@@ -71,10 +69,9 @@ public class TenantRepositoryImpl implements TenantRepository {
                     .values(
                             UUID.fromString(tenantId.value()),
                             eventType,
-                            DSL.field("CAST(? AS JSONB)", String.class),
+                            eventData,
                             expectedVersion,
                             extractOccurredAt(event))
-                    .bind(1, eventData)
                     .execute();
 
             // Update projection asynchronously (synchronously for now)
@@ -102,13 +99,9 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             List<TenantEvents> events = new ArrayList<>();
             for (Record record : records) {
-                String eventType = record.get("event_type", String.class);
-                String eventData = record.get("event_data", String.class);
-
-                TenantEvents event = deserializeEvent(eventType, eventData);
-                if (event != null) {
-                    events.add(event);
-                }
+                byte[] eventData = record.get("event_data", byte[].class);
+                TenantEvents event = KryoEventSerializer.deserialize(eventData);
+                events.add(event);
             }
 
             return Result.success(events);
@@ -365,15 +358,5 @@ public class TenantRepositoryImpl implements TenantRepository {
                     var updatedAt,
                     var version) -> updatedAt;
         };
-    }
-
-    @SuppressWarnings("unchecked")
-    private TenantEvents deserializeEvent(String eventType, String eventData) {
-        try {
-            Class<?> eventClass = Class.forName("com.k12.tenant.domain.models.events.TenantEvents$" + eventType);
-            return (TenantEvents) objectMapper.readValue(eventData, eventClass);
-        } catch (Exception e) {
-            return null;
-        }
     }
 }
