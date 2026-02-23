@@ -87,7 +87,7 @@ public class TenantService {
      * @return Result containing the event or error
      */
     public Result<TenantEvents, TenantError> processCommand(TenantId tenantId, TenantCommands command) {
-        // Load tenant
+        // Load tenant (which includes version)
         var tenantResult = tenantRepository.load(tenantId);
         if (tenantResult.isFailure()) {
             return Result.failure(tenantResult.getError());
@@ -95,26 +95,51 @@ public class TenantService {
 
         Tenant tenant = tenantResult.get();
 
-        // Get current version
-        var versionResult = tenantRepository.getCurrentVersion(tenantId);
-        if (versionResult.isFailure()) {
-            return Result.failure(versionResult.getError());
-        }
-
-        // Process command
+        // Process command (event will have tenant.version + 1)
         var eventResult = tenant.process(command);
         if (eventResult.isFailure()) {
             return eventResult;
         }
 
-        // Append event
-        long nextVersion = versionResult.get() + 1;
-        var appendResult = tenantRepository.append(eventResult.get(), nextVersion);
+        // Append event with version from the event itself
+        long eventVersion = extractVersion(eventResult.get());
+        var appendResult = tenantRepository.append(eventResult.get(), eventVersion);
         if (appendResult.isFailure()) {
             return Result.failure(appendResult.getError());
         }
 
         return eventResult;
+    }
+
+    /**
+     * Extracts version from an event.
+     */
+    private long extractVersion(TenantEvents event) {
+        return switch (event) {
+            case TenantEvents.TenantCreated(
+                    var tenantId,
+                    var name,
+                    var subdomain,
+                    var status,
+                    var createdAt,
+                    long version) -> version;
+            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, long version) -> version;
+            case TenantEvents.TenantActivated(var tenantId, var activatedAt, long version) -> version;
+            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, long version) -> version;
+            case TenantEvents.TenantDeleted(var tenantId, var deletedAt, long version) -> version;
+            case TenantEvents.TenantNameUpdated(
+                    var tenantId,
+                    var newName,
+                    var previousName,
+                    var updatedAt,
+                    long version) -> version;
+            case TenantEvents.TenantSubdomainUpdated(
+                    var tenantId,
+                    var newSubdomain,
+                    var previousSubdomain,
+                    var updatedAt,
+                    long version) -> version;
+        };
     }
 
     /**

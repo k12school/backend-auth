@@ -85,12 +85,12 @@ public final class TenantReconstructor {
 
         Result<Tenant, TenantError> currentResult = null;
         TenantId tenantId = null;
-        long expectedVersion = 1;
+        Long expectedVersion = 1L;
 
         for (TenantEvents event : events) {
             // Validate version sequence
             Long eventVersion = extractVersion(event);
-            if (eventVersion != null && eventVersion != expectedVersion) {
+            if (eventVersion != null && !eventVersion.equals(expectedVersion)) {
                 return Result.failure(TenantError.ValidationError.INVALID_VALUE);
             }
 
@@ -142,36 +142,50 @@ public final class TenantReconstructor {
                     var subdomain,
                     var status,
                     var createdAt,
-                    var version) -> Result.success(new Tenant(tenantId, name, subdomain, status));
+                    long version) -> Result.success(new Tenant(tenantId, name, subdomain, status, version));
 
-            // TenantSuspended: Changes status to SUSPENDED
-            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version)
-            when tenant != null -> Result.success(tenant.withStatus(TenantStatus.SUSPENDED));
+            // TenantSuspended: Changes status to SUSPENDED and updates version
+            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, long version)
+            when tenant != null ->
+                Result.success(
+                        new Tenant(tenant.id(), tenant.name(), tenant.subdomain(), TenantStatus.SUSPENDED, version));
 
-            // TenantActivated: Changes status to ACTIVE
-            case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version)
-            when tenant != null -> Result.success(tenant.withStatus(TenantStatus.ACTIVE));
+            // TenantActivated: Changes status to ACTIVE and updates version
+            case TenantEvents.TenantActivated(var tenantId, var activatedAt, long version)
+            when tenant != null ->
+                Result.success(
+                        new Tenant(tenant.id(), tenant.name(), tenant.subdomain(), TenantStatus.ACTIVE, version));
 
-            // TenantDeactivated: Changes status to INACTIVE
-            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version)
-            when tenant != null -> Result.success(tenant.withStatus(TenantStatus.INACTIVE));
+            // TenantDeactivated: Changes status to INACTIVE and updates version
+            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, long version)
+            when tenant != null ->
+                Result.success(
+                        new Tenant(tenant.id(), tenant.name(), tenant.subdomain(), TenantStatus.INACTIVE, version));
 
-            // TenantDeleted: Marks tenant as deleted (status remains unchanged)
-            case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version)
-            when tenant != null -> Result.success(tenant);
+            // TenantDeleted: Marks tenant as deleted (status remains unchanged), updates version
+            case TenantEvents.TenantDeleted(var tenantId, var deletedAt, long version)
+            when tenant != null ->
+                Result.success(new Tenant(tenant.id(), tenant.name(), tenant.subdomain(), tenant.status(), version));
 
-            // TenantNameUpdated: Changes name
-            case TenantEvents.TenantNameUpdated(var tenantId, var newName, var previousName, var updatedAt, var version)
-            when tenant != null -> Result.success(tenant.withName(newName));
+            // TenantNameUpdated: Changes name and updates version
+            case TenantEvents.TenantNameUpdated(
+                    var tenantId,
+                    var newName,
+                    var previousName,
+                    var updatedAt,
+                    long version)
+            when tenant != null ->
+                Result.success(new Tenant(tenant.id(), newName, tenant.subdomain(), tenant.status(), version));
 
-            // TenantSubdomainUpdated: Changes subdomain
+            // TenantSubdomainUpdated: Changes subdomain and updates version
             case TenantEvents.TenantSubdomainUpdated(
                     var tenantId,
                     var newSubdomain,
                     var previousSubdomain,
                     var updatedAt,
-                    var version)
-            when tenant != null -> Result.success(tenant.withSubdomain(newSubdomain));
+                    long version)
+            when tenant != null ->
+                Result.success(new Tenant(tenant.id(), tenant.name(), newSubdomain, tenant.status(), version));
 
             // Handle null tenant case (shouldn't happen with proper event stream)
             default -> Result.failure(TenantError.ValidationError.INVALID_VALUE);

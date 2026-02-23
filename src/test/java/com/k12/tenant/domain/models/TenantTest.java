@@ -246,7 +246,8 @@ class TenantTest {
                 TenantId.generate(),
                 TenantName.of("Test Tenant").get(),
                 Subdomain.of("testtenant").get(),
-                TenantStatus.ACTIVE);
+                TenantStatus.ACTIVE,
+                1L);
     }
 
     private Tenant createSuspendedTenant() {
@@ -254,7 +255,8 @@ class TenantTest {
                 TenantId.generate(),
                 TenantName.of("Test Tenant").get(),
                 Subdomain.of("testtenant").get(),
-                TenantStatus.SUSPENDED);
+                TenantStatus.SUSPENDED,
+                1L);
     }
 
     private Tenant createInactiveTenant() {
@@ -262,6 +264,7 @@ class TenantTest {
                 TenantId.generate(),
                 TenantName.of("Test Tenant").get(),
                 Subdomain.of("testtenant").get(),
-                TenantStatus.INACTIVE);
+                TenantStatus.INACTIVE,
+                1L);
     }
 }

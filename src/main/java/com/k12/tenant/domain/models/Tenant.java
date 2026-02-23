@@ -30,7 +30,8 @@ public record Tenant(
         TenantId id,
         @With TenantName name,
         @With Subdomain subdomain,
-        @With TenantStatus status) {
+        @With TenantStatus status,
+        long version) {
 
     public Result<TenantEvents, TenantError> process(TenantCommands command) {
         return switch (command) {
@@ -52,9 +53,8 @@ public record Tenant(
         if (this.status == TenantStatus.SUSPENDED) {
             return Result.failure(TENANT_ALREADY_SUSPENDED);
         }
-        return Result.success(new TenantSuspended(
-                this.id(), now(), System.currentTimeMillis() // version placeholder
-                ));
+        long nextVersion = this.version + 1;
+        return Result.success(new TenantSuspended(this.id(), now(), nextVersion));
     }
 
     /**
@@ -68,9 +68,8 @@ public record Tenant(
         if (this.status == TenantStatus.INACTIVE) {
             return Result.failure(CANNOT_ACTIVATE_INACTIVE);
         }
-        return Result.success(new TenantActivated(
-                this.id(), now(), System.currentTimeMillis() // version placeholder
-                ));
+        long nextVersion = this.version + 1;
+        return Result.success(new TenantActivated(this.id(), now(), nextVersion));
     }
 
     /**
@@ -81,9 +80,8 @@ public record Tenant(
         if (this.status == TenantStatus.INACTIVE) {
             return Result.failure(TENANT_ALREADY_INACTIVE);
         }
-        return Result.success(new TenantEvents.TenantDeactivated(
-                this.id(), now(), System.currentTimeMillis() // version placeholder
-                ));
+        long nextVersion = this.version + 1;
+        return Result.success(new TenantEvents.TenantDeactivated(this.id(), now(), nextVersion));
     }
 
     /**
@@ -94,9 +92,8 @@ public record Tenant(
         if (this.status == TenantStatus.ACTIVE) {
             return Result.failure(CANNOT_DELETE_ACTIVE);
         }
-        return Result.success(new TenantEvents.TenantDeleted(
-                this.id(), now(), System.currentTimeMillis() // version placeholder
-                ));
+        long nextVersion = this.version + 1;
+        return Result.success(new TenantEvents.TenantDeleted(this.id(), now(), nextVersion));
     }
 
     /**
@@ -109,9 +106,8 @@ public record Tenant(
         }
 
         String previousName = this.name.value();
-        return Result.success(new TenantNameUpdated(
-                this.id(), command.newName(), previousName, now(), System.currentTimeMillis() // version placeholder
-                ));
+        long nextVersion = this.version + 1;
+        return Result.success(new TenantNameUpdated(this.id(), command.newName(), previousName, now(), nextVersion));
     }
 
     /**
@@ -124,13 +120,9 @@ public record Tenant(
         }
 
         String previousSubdomain = this.subdomain.value();
-        return Result.success(new TenantSubdomainUpdated(
-                this.id(),
-                command.newSubdomain(),
-                previousSubdomain,
-                now(),
-                System.currentTimeMillis() // version placeholder
-                ));
+        long nextVersion = this.version + 1;
+        return Result.success(
+                new TenantSubdomainUpdated(this.id(), command.newSubdomain(), previousSubdomain, now(), nextVersion));
     }
 
     /**
