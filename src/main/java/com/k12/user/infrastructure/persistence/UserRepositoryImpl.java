@@ -10,6 +10,7 @@ import com.k12.tenant.infrastructure.persistence.KryoEventSerializer;
 import com.k12.user.domain.models.User;
 import com.k12.user.domain.models.UserReconstructor;
 import com.k12.user.domain.models.error.UserError;
+import com.k12.user.domain.models.events.UserEvents;
 import com.k12.user.domain.ports.out.UserRepository;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -40,7 +41,7 @@ public class UserRepositoryImpl implements UserRepository {
     public Optional<User> findById(UserId userId) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
         try {
-            List<com.k12.user.domain.models.events.UserEvents> events = loadEvents(ctx, userId.value());
+            List<UserEvents> events = loadEvents(ctx, userId.value());
             if (events.isEmpty()) {
                 return Optional.empty();
             }
@@ -91,13 +92,13 @@ public class UserRepositoryImpl implements UserRepository {
      * @param userId The user ID
      * @return List of events in chronological order
      */
-    private List<com.k12.user.domain.models.events.UserEvents> loadEvents(DSLContext ctx, UUID userId) {
+    private List<UserEvents> loadEvents(DSLContext ctx, UUID userId) {
         try {
             List<UserEventsRecord> records = ctx.selectFrom(USER_EVENTS)
                     .where(USER_EVENTS.USER_ID.eq(userId))
                     .orderBy(USER_EVENTS.VERSION.asc())
                     .fetch();
-            List<com.k12.user.domain.models.events.UserEvents> events = new ArrayList<>();
+            List<UserEvents> events = new ArrayList<>();
             for (UserEventsRecord record : records) {
                 byte[] eventData = record.getEventData();
                 events.add(KryoEventSerializer.deserializeUserEvent(eventData));
