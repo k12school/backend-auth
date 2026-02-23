@@ -136,6 +136,74 @@ public final class KryoEventSerializer {
     }
 
     /**
+     * Deserialize a User event from Kryo format.
+     * Creates a separate Kryo instance configured for User domain events.
+     *
+     * @param data the byte array to deserialize
+     * @return deserialized User event
+     */
+    public static com.k12.user.domain.models.events.UserEvents deserializeUserEvent(byte[] data) {
+        if (data == null || data.length == 0) {
+            throw new IllegalArgumentException("Cannot deserialize null or empty data");
+        }
+        try (Input input = new Input(data)) {
+            Kryo kryo = createUserEventKryo();
+            Object obj = kryo.readClassAndObject(input);
+            if (!(obj instanceof com.k12.user.domain.models.events.UserEvents)) {
+                throw new SerializationException("Deserialized object is not a UserEvents: " + obj.getClass());
+            }
+            return (com.k12.user.domain.models.events.UserEvents) obj;
+        } catch (Exception e) {
+            throw new SerializationException("Failed to deserialize User event", e);
+        }
+    }
+
+    /**
+     * Creates a Kryo instance configured for User domain events.
+     * This is a separate instance to avoid conflicts with Tenant event registration.
+     */
+    private static Kryo createUserEventKryo() {
+        Kryo kryo = new Kryo();
+
+        // Register common types
+        kryo.register(UUID.class, new KryoUuidSerializer());
+        kryo.register(String.class);
+        kryo.register(long.class);
+        kryo.register(int.class);
+        kryo.register(boolean.class);
+
+        // Register Java time types
+        kryo.register(Instant.class, new JavaSerializer());
+
+        // Register User value objects
+        kryo.register(com.k12.common.domain.model.UserId.class);
+        kryo.register(com.k12.user.domain.models.EmailAddress.class);
+        kryo.register(com.k12.user.domain.models.PasswordHash.class);
+        kryo.register(com.k12.user.domain.models.UserName.class);
+        kryo.register(com.k12.user.domain.models.UserRole.class);
+        kryo.register(com.k12.user.domain.models.UserStatus.class);
+        kryo.register(java.util.HashSet.class);
+        kryo.register(java.util.ArrayList.class);
+
+        // Register all UserEvents subclasses
+        int classId = 200;
+        kryo.register(com.k12.user.domain.models.events.UserEvents.UserCreated.class, classId++);
+        kryo.register(com.k12.user.domain.models.events.UserEvents.UserSuspended.class, classId++);
+        kryo.register(com.k12.user.domain.models.events.UserEvents.UserActivated.class, classId++);
+        kryo.register(com.k12.user.domain.models.events.UserEvents.UserEmailUpdated.class, classId++);
+        kryo.register(com.k12.user.domain.models.events.UserEvents.UserPasswordUpdated.class, classId++);
+        kryo.register(com.k12.user.domain.models.events.UserEvents.UserRoleAdded.class, classId++);
+        kryo.register(com.k12.user.domain.models.events.UserEvents.UserRoleRemoved.class, classId++);
+        kryo.register(com.k12.user.domain.models.events.UserEvents.UserNameUpdated.class, classId++);
+
+        // Configure settings
+        kryo.setReferences(false);
+        kryo.setRegistrationRequired(true);
+
+        return kryo;
+    }
+
+    /**
      * Exception thrown when serialization or deserialization fails.
      */
     public static class SerializationException extends RuntimeException {
