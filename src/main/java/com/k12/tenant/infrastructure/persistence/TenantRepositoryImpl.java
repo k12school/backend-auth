@@ -1,8 +1,11 @@
 package com.k12.tenant.infrastructure.persistence;
 
+import static com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS;
+import static com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS;
 import static com.k12.tenant.domain.models.error.TenantError.ConcurrencyError.VERSION_CONFLICT;
 import static com.k12.tenant.domain.models.error.TenantError.PersistenceError.STORAGE_ERROR;
 
+import com.k12.backend.infrastructure.jooq.public_.tables.records.TenantEventsRecord;
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.TenantId;
 import com.k12.tenant.domain.models.Tenant;
@@ -12,20 +15,29 @@ import com.k12.tenant.domain.models.events.TenantEvents;
 import com.k12.tenant.domain.port.TenantRepository;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
-import java.sql.SQLException;
+import jakarta.transaction.Transactional;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
-import org.jooq.Record;
 import org.jooq.SQLDialect;
+import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.impl.DSL;
 
 /**
- * Implementation of TenantRepository using jOOQ DSL for event sourcing.
+ * Implementation of TenantRepository using jOOQ with transactional correctness.
  * All methods return Result<T, E> following ROP pattern.
+ *
+ * <p>Version semantics: The caller provides the expected NEW version number.
+ * The database enforces uniqueness via the (tenant_id, version) constraint.
+ * If an event with the same version already exists, the insert fails with VERSION_CONFLICT.
+ *
+ * <p>Transactions: Uses Quarkus @Transactional to ensure atomicity.
  */
 @ApplicationScoped
 @RequiredArgsConstructor
@@ -33,56 +45,45 @@ public class TenantRepositoryImpl implements TenantRepository {
 
     private final AgroalDataSource dataSource;
 
-    // Table and column names (jOOQ will generate these from schema)
-    private static final String TENANT_EVENTS = "tenant_events";
-    private static final String TENANTS = "tenants";
-
     @Override
+    @Transactional
     public Result<Void, TenantError> append(TenantEvents event, long expectedVersion) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
-        TenantId tenantId = extractTenantId(event);
 
         try {
-            // Check for version conflict (optimistic locking)
-            Long currentVersion = ctx.select(DSL.field("version"))
-                    .from(TENANT_EVENTS)
-                    .where(DSL.field("tenant_id").eq(UUID.fromString(tenantId.value())))
-                    .orderBy(DSL.field("version").desc())
-                    .fetchOne(DSL.field("version", Long.class));
-
-            if (currentVersion != null && currentVersion >= expectedVersion) {
-                return Result.failure(VERSION_CONFLICT);
-            }
-
-            // Serialize event to binary using Kryo
-            byte[] eventData = KryoEventSerializer.serialize(event);
-            String eventType = event.getClass().getSimpleName();
-
-            // Insert event
-            ctx.insertInto(
-                            DSL.table(TENANT_EVENTS),
-                            DSL.field("tenant_id"),
-                            DSL.field("event_type"),
-                            DSL.field("event_data"),
-                            DSL.field("version"),
-                            DSL.field("occurred_at"))
+            // Insert event with conflict detection
+            // The unique constraint (tenant_id, version) ensures optimistic locking
+            OffsetDateTime occurredAt = OffsetDateTime.ofInstant(extractOccurredAt(event), ZoneOffset.UTC);
+            int inserted = ctx.insertInto(
+                            TENANT_EVENTS,
+                            TENANT_EVENTS.TENANT_ID,
+                            TENANT_EVENTS.EVENT_TYPE,
+                            TENANT_EVENTS.EVENT_DATA,
+                            TENANT_EVENTS.VERSION,
+                            TENANT_EVENTS.OCCURRED_AT)
                     .values(
-                            UUID.fromString(tenantId.value()),
-                            eventType,
-                            eventData,
+                            extractTenantIdUUID(event),
+                            event.getClass().getSimpleName(),
+                            KryoEventSerializer.serialize(event),
                             expectedVersion,
-                            extractOccurredAt(event))
+                            occurredAt)
+                    .onConflict(TENANT_EVENTS.TENANT_ID, TENANT_EVENTS.VERSION)
+                    .doNothing()
                     .execute();
 
-            // Update projection asynchronously (synchronously for now)
-            updateProjection(event);
-
-            return Result.success(null);
-        } catch (Exception e) {
-            // Handle unique constraint violation (version conflict)
-            if (e.getCause() instanceof SQLException) {
+            // If 0 rows inserted, version already exists => conflict
+            if (inserted == 0) {
                 return Result.failure(VERSION_CONFLICT);
             }
+
+            // Update projection in the same transaction
+            updateProjection(ctx, event);
+
+            return Result.success(null);
+        } catch (IntegrityConstraintViolationException e) {
+            // Catch any other constraint violations
+            return Result.failure(STORAGE_ERROR);
+        } catch (Exception e) {
             return Result.failure(STORAGE_ERROR);
         }
     }
@@ -92,16 +93,15 @@ public class TenantRepositoryImpl implements TenantRepository {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
         try {
-            List<Record> records = ctx.selectFrom(TENANT_EVENTS)
-                    .where(DSL.field("tenant_id").eq(UUID.fromString(tenantId.value())))
-                    .orderBy(DSL.field("version").asc())
+            List<TenantEventsRecord> records = ctx.selectFrom(TENANT_EVENTS)
+                    .where(TENANT_EVENTS.TENANT_ID.eq(UUID.fromString(tenantId.value())))
+                    .orderBy(TENANT_EVENTS.VERSION.asc())
                     .fetch();
 
             List<TenantEvents> events = new ArrayList<>();
-            for (Record record : records) {
-                byte[] eventData = record.get("event_data", byte[].class);
-                TenantEvents event = KryoEventSerializer.deserialize(eventData);
-                events.add(event);
+            for (TenantEventsRecord record : records) {
+                byte[] eventData = record.getEventData();
+                events.add(KryoEventSerializer.deserialize(eventData));
             }
 
             return Result.success(events);
@@ -125,9 +125,9 @@ public class TenantRepositoryImpl implements TenantRepository {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
         try {
-            Long version = ctx.select(DSL.max(DSL.field("version", Long.class)))
+            Long version = ctx.select(DSL.max(TENANT_EVENTS.VERSION))
                     .from(TENANT_EVENTS)
-                    .where(DSL.field("tenant_id").eq(UUID.fromString(tenantId.value())))
+                    .where(TENANT_EVENTS.TENANT_ID.eq(UUID.fromString(tenantId.value())))
                     .fetchOneInto(Long.class);
 
             if (version == null) {
@@ -145,12 +145,9 @@ public class TenantRepositoryImpl implements TenantRepository {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
         try {
-            Integer count = ctx.select(DSL.count())
-                    .from(TENANTS)
-                    .where(DSL.field("name").eq(name))
-                    .fetchOneInto(Integer.class);
+            boolean exists = ctx.fetchExists(ctx.selectOne().from(TENANTS).where(TENANTS.NAME.eq(name)));
 
-            return Result.success(count != null && count > 0);
+            return Result.success(exists);
         } catch (Exception e) {
             return Result.failure(STORAGE_ERROR);
         }
@@ -161,12 +158,9 @@ public class TenantRepositoryImpl implements TenantRepository {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
         try {
-            Integer count = ctx.select(DSL.count())
-                    .from(TENANTS)
-                    .where(DSL.field("subdomain").eq(subdomain))
-                    .fetchOneInto(Integer.class);
+            boolean exists = ctx.fetchExists(ctx.selectOne().from(TENANTS).where(TENANTS.SUBDOMAIN.eq(subdomain)));
 
-            return Result.success(count != null && count > 0);
+            return Result.success(exists);
         } catch (Exception e) {
             return Result.failure(STORAGE_ERROR);
         }
@@ -177,10 +171,10 @@ public class TenantRepositoryImpl implements TenantRepository {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
         try {
-            UUID id = ctx.select(DSL.field("id", UUID.class))
+            UUID id = ctx.select(TENANTS.ID)
                     .from(TENANTS)
-                    .where(DSL.field("name").eq(name))
-                    .fetchOneInto(UUID.class);
+                    .where(TENANTS.NAME.eq(name))
+                    .fetchOne(TENANTS.ID);
 
             return id != null ? Optional.of(new TenantId(id.toString())) : Optional.empty();
         } catch (Exception e) {
@@ -193,10 +187,10 @@ public class TenantRepositoryImpl implements TenantRepository {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
         try {
-            UUID id = ctx.select(DSL.field("id", UUID.class))
+            UUID id = ctx.select(TENANTS.ID)
                     .from(TENANTS)
-                    .where(DSL.field("subdomain").eq(subdomain))
-                    .fetchOneInto(UUID.class);
+                    .where(TENANTS.SUBDOMAIN.eq(subdomain))
+                    .fetchOne(TENANTS.ID);
 
             return id != null ? Optional.of(new TenantId(id.toString())) : Optional.empty();
         } catch (Exception e) {
@@ -206,70 +200,58 @@ public class TenantRepositoryImpl implements TenantRepository {
 
     /**
      * Updates the read projection after appending an event.
+     *
+     * @param ctx The DSLContext
+     * @param event The event to project
      */
-    private void updateProjection(TenantEvents event) {
-        DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
-
+    private void updateProjection(DSLContext ctx, TenantEvents event) {
         switch (event) {
             case TenantEvents.TenantCreated(
-                    TenantId tenantId,
+                    var tenantId,
                     var name,
                     var subdomain,
                     var status,
                     var createdAt,
                     var version) -> {
+                OffsetDateTime timestamp = OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC);
                 ctx.insertInto(
-                                DSL.table(TENANTS),
-                                DSL.field("id"),
-                                DSL.field("name"),
-                                DSL.field("subdomain"),
-                                DSL.field("status"),
-                                DSL.field("version"),
-                                DSL.field("created_at"),
-                                DSL.field("updated_at"))
+                                TENANTS,
+                                TENANTS.ID,
+                                TENANTS.NAME,
+                                TENANTS.SUBDOMAIN,
+                                TENANTS.STATUS,
+                                TENANTS.VERSION,
+                                TENANTS.CREATED_AT,
+                                TENANTS.UPDATED_AT)
                         .values(
                                 UUID.fromString(tenantId.value()),
                                 name.value(),
                                 subdomain.value(),
                                 status.name(),
                                 version,
-                                createdAt,
-                                createdAt)
-                        .onConflict(DSL.field("id"))
+                                timestamp,
+                                timestamp)
+                        .onConflict(TENANTS.ID)
                         .doNothing()
                         .execute();
                 break;
             }
             case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version) -> {
-                ctx.update(DSL.table(TENANTS))
-                        .set(DSL.field("status"), "SUSPENDED")
-                        .set(DSL.field("version"), version)
-                        .set(DSL.field("updated_at"), suspendedAt)
-                        .where(DSL.field("id").eq(UUID.fromString(tenantId.value())))
-                        .execute();
+                updateTenantWithVersionCheck(ctx, UUID.fromString(tenantId.value()), version, suspendedAt, "SUSPENDED");
                 break;
             }
             case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version) -> {
-                ctx.update(DSL.table(TENANTS))
-                        .set(DSL.field("status"), "ACTIVE")
-                        .set(DSL.field("version"), version)
-                        .set(DSL.field("updated_at"), activatedAt)
-                        .where(DSL.field("id").eq(UUID.fromString(tenantId.value())))
-                        .execute();
+                updateTenantWithVersionCheck(ctx, UUID.fromString(tenantId.value()), version, activatedAt, "ACTIVE");
                 break;
             }
             case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version) -> {
-                ctx.update(DSL.table(TENANTS))
-                        .set(DSL.field("status"), "INACTIVE")
-                        .set(DSL.field("version"), version)
-                        .set(DSL.field("updated_at"), deactivatedAt)
-                        .where(DSL.field("id").eq(UUID.fromString(tenantId.value())))
-                        .execute();
+                updateTenantWithVersionCheck(
+                        ctx, UUID.fromString(tenantId.value()), version, deactivatedAt, "INACTIVE");
                 break;
             }
             case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version) -> {
-                ctx.deleteFrom(DSL.table(TENANTS))
-                        .where(DSL.field("id").eq(UUID.fromString(tenantId.value())))
+                ctx.deleteFrom(TENANTS)
+                        .where(TENANTS.ID.eq(UUID.fromString(tenantId.value())))
                         .execute();
                 break;
             }
@@ -279,11 +261,12 @@ public class TenantRepositoryImpl implements TenantRepository {
                     var previousName,
                     var updatedAt,
                     var version) -> {
-                ctx.update(DSL.table(TENANTS))
-                        .set(DSL.field("name"), newName.value())
-                        .set(DSL.field("version"), version)
-                        .set(DSL.field("updated_at"), updatedAt)
-                        .where(DSL.field("id").eq(UUID.fromString(tenantId.value())))
+                OffsetDateTime timestamp = OffsetDateTime.ofInstant(updatedAt, ZoneOffset.UTC);
+                ctx.update(TENANTS)
+                        .set(TENANTS.NAME, newName.value())
+                        .set(TENANTS.VERSION, version)
+                        .set(TENANTS.UPDATED_AT, timestamp)
+                        .where(TENANTS.ID.eq(UUID.fromString(tenantId.value())))
                         .execute();
                 break;
             }
@@ -293,18 +276,40 @@ public class TenantRepositoryImpl implements TenantRepository {
                     var previousSubdomain,
                     var updatedAt,
                     var version) -> {
-                ctx.update(DSL.table(TENANTS))
-                        .set(DSL.field("subdomain"), newSubdomain.value())
-                        .set(DSL.field("version"), version)
-                        .set(DSL.field("updated_at"), updatedAt)
-                        .where(DSL.field("id").eq(UUID.fromString(tenantId.value())))
+                OffsetDateTime timestamp = OffsetDateTime.ofInstant(updatedAt, ZoneOffset.UTC);
+                ctx.update(TENANTS)
+                        .set(TENANTS.SUBDOMAIN, newSubdomain.value())
+                        .set(TENANTS.VERSION, version)
+                        .set(TENANTS.UPDATED_AT, timestamp)
+                        .where(TENANTS.ID.eq(UUID.fromString(tenantId.value())))
                         .execute();
                 break;
             }
         }
     }
 
-    private TenantId extractTenantId(TenantEvents event) {
+    /**
+     * Helper to update tenant status.
+     *
+     * @param ctx The DSLContext
+     * @param tenantId The tenant ID
+     * @param newVersion The new version
+     * @param updatedAt The update timestamp
+     * @param newStatus The new status
+     */
+    private void updateTenantWithVersionCheck(
+            DSLContext ctx, UUID tenantId, long newVersion, Instant updatedAt, String newStatus) {
+
+        OffsetDateTime timestamp = OffsetDateTime.ofInstant(updatedAt, ZoneOffset.UTC);
+        ctx.update(TENANTS)
+                .set(TENANTS.STATUS, newStatus)
+                .set(TENANTS.VERSION, newVersion)
+                .set(TENANTS.UPDATED_AT, timestamp)
+                .where(TENANTS.ID.eq(tenantId))
+                .execute();
+    }
+
+    private UUID extractTenantIdUUID(TenantEvents event) {
         return switch (event) {
             case TenantEvents.TenantCreated(
                     var tenantId,
@@ -312,27 +317,31 @@ public class TenantRepositoryImpl implements TenantRepository {
                     var subdomain,
                     var status,
                     var createdAt,
-                    var version) -> tenantId;
-            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version) -> tenantId;
-            case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version) -> tenantId;
-            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version) -> tenantId;
-            case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version) -> tenantId;
+                    var version) -> UUID.fromString(tenantId.value());
+            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version) ->
+                UUID.fromString(tenantId.value());
+            case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version) ->
+                UUID.fromString(tenantId.value());
+            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version) ->
+                UUID.fromString(tenantId.value());
+            case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version) ->
+                UUID.fromString(tenantId.value());
             case TenantEvents.TenantNameUpdated(
                     var tenantId,
                     var newName,
                     var previousName,
                     var updatedAt,
-                    var version) -> tenantId;
+                    var version) -> UUID.fromString(tenantId.value());
             case TenantEvents.TenantSubdomainUpdated(
                     var tenantId,
                     var newSubdomain,
                     var previousSubdomain,
                     var updatedAt,
-                    var version) -> tenantId;
+                    var version) -> UUID.fromString(tenantId.value());
         };
     }
 
-    private java.time.Instant extractOccurredAt(TenantEvents event) {
+    private Instant extractOccurredAt(TenantEvents event) {
         return switch (event) {
             case TenantEvents.TenantCreated(
                     var tenantId,
