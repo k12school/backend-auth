@@ -1,5 +1,12 @@
 package com.k12.tenant.domain.models;
 
+import static com.k12.tenant.domain.models.error.TenantError.NameError.EMPTY;
+import static com.k12.tenant.domain.models.error.TenantError.NameError.NAME_TOO_LONG;
+import static com.k12.tenant.domain.models.error.TenantError.NameError.NAME_TOO_SHORT;
+
+import com.k12.common.domain.model.Result;
+import com.k12.tenant.domain.models.error.TenantError;
+
 /**
  * Value object representing a tenant's name.
  */
@@ -9,23 +16,22 @@ public record TenantName(String value) {
     private static final int MAX_LENGTH = 100;
 
     /**
-     * Factory method to create a validated TenantName.
+     * Factory method to create a validated TenantName using ROP pattern.
      *
      * @param value The name value
-     * @return A validated TenantName
-     * @throws IllegalArgumentException if validation fails
+     * @return Result containing TenantName on success, or TenantError on failure
      */
-    public static TenantName of(String value) {
+    public static Result<TenantName, TenantError> of(String value) {
         if (value == null || value.trim().isEmpty()) {
-            throw new IllegalArgumentException("Name cannot be null or empty");
+            return Result.failure(EMPTY);
         }
         String trimmed = value.trim();
         if (trimmed.length() < MIN_LENGTH) {
-            throw new IllegalArgumentException("Name must be at least " + MIN_LENGTH + " characters long");
+            return Result.failure(NAME_TOO_SHORT);
         }
         if (trimmed.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException("Name cannot exceed " + MAX_LENGTH + " characters");
+            return Result.failure(NAME_TOO_LONG);
         }
-        return new TenantName(trimmed);
+        return Result.success(new TenantName(trimmed));
     }
 }

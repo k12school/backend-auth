@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: k12-postgres-dev
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-k12_db}

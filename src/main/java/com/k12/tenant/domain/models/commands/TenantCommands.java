@@ -14,7 +14,8 @@ public sealed interface TenantCommands
                 TenantCommands.ActivateTenant,
                 TenantCommands.UpdateName,
                 TenantCommands.UpdateSubdomain,
-                TenantCommands.DeactivateTenant {
+                TenantCommands.DeactivateTenant,
+                TenantCommands.DeleteTenant {
 
     /**
      * Command to create a new tenant.
@@ -35,6 +36,12 @@ public sealed interface TenantCommands
      * Command to deactivate a tenant (soft delete).
      */
     record DeactivateTenant(TenantId tenantId) implements TenantCommands {}
+
+    /**
+     * Command to delete a tenant (permanently).
+     * Tenant must be suspended before deletion.
+     */
+    record DeleteTenant(TenantId tenantId) implements TenantCommands {}
 
     /**
      * Command to update a tenant's name.

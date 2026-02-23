@@ -3,8 +3,14 @@ package com.k12.tenant.infrastructure.persistence;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
+import com.k12.common.domain.model.TenantId;
+import com.k12.tenant.domain.models.Subdomain;
+import com.k12.tenant.domain.models.TenantName;
+import com.k12.tenant.domain.models.TenantStatus;
 import com.k12.tenant.domain.models.events.TenantEvents;
 import java.io.ByteArrayOutputStream;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -73,6 +79,15 @@ public final class KryoEventSerializer {
             kryo.register(long.class);
             kryo.register(int.class);
             kryo.register(boolean.class);
+
+            // Register Java time types (use Java serializer for compatibility)
+            kryo.register(Instant.class, new JavaSerializer());
+
+            // Register value objects
+            kryo.register(TenantId.class);
+            kryo.register(TenantName.class);
+            kryo.register(Subdomain.class);
+            kryo.register(TenantStatus.class);
 
             // Register event classes explicitly for version stability
             registerEventClasses(kryo);

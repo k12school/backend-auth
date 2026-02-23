@@ -1,8 +1,5 @@
 package com.k12.tenant.domain.models;
 
-import static com.k12.tenant.domain.models.error.TenantError.NameError.NAME_EMPTY;
-import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_INVALID_FORMAT;
-
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.TenantId;
 import com.k12.tenant.domain.models.commands.TenantCommands.CreateTenant;
@@ -28,7 +25,7 @@ public final class TenantFactory {
     }
 
     /**
-     * Creates a new tenant with validation.
+     * Creates a new tenant with validation using ROP pattern.
      *
      * @param name Tenant's name string
      * @param subdomain Tenant's subdomain string
@@ -36,22 +33,18 @@ public final class TenantFactory {
      */
     public static Result<TenantEvents, TenantError> create(String name, String subdomain) {
         // Validate and create TenantName
-        TenantName tenantName;
-        try {
-            tenantName = TenantName.of(name);
-        } catch (IllegalArgumentException e) {
-            return Result.failure(NAME_EMPTY);
+        var nameResult = TenantName.of(name);
+        if (nameResult.isFailure()) {
+            return Result.failure(nameResult.getError());
         }
 
         // Validate and create Subdomain
-        Subdomain subdomainObj;
-        try {
-            subdomainObj = Subdomain.of(subdomain);
-        } catch (IllegalArgumentException e) {
-            return Result.failure(SUBDOMAIN_INVALID_FORMAT);
+        var subdomainResult = Subdomain.of(subdomain);
+        if (subdomainResult.isFailure()) {
+            return Result.failure(subdomainResult.getError());
         }
 
-        return create(tenantName, subdomainObj);
+        return create(nameResult.get(), subdomainResult.get());
     }
 
     /**
@@ -66,8 +59,6 @@ public final class TenantFactory {
         TenantId tenantId = TenantId.generate();
         java.time.Instant now = java.time.Instant.now();
         long version = 1L;
-
-        Tenant tenant = new Tenant(tenantId, name, subdomain, TenantStatus.ACTIVE);
 
         return Result.success(
                 new TenantEvents.TenantCreated(tenantId, name, subdomain, TenantStatus.ACTIVE, now, version));

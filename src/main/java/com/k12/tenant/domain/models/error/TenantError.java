@@ -7,7 +7,15 @@ public sealed interface TenantError
         permits TenantError.TenantStatusError,
                 TenantError.NameError,
                 TenantError.SubdomainError,
-                TenantError.ValidationError {
+                TenantError.ValidationError,
+                TenantError.ConcurrencyError,
+                TenantError.PersistenceError,
+                TenantError.ConflictError {
+
+    /**
+     * Returns the error message.
+     */
+    String message();
 
     /**
      * Errors related to tenant status operations.
@@ -16,7 +24,8 @@ public sealed interface TenantError
         TENANT_ALREADY_SUSPENDED("Tenant is already suspended"),
         TENANT_ALREADY_ACTIVE("Tenant is already active"),
         TENANT_ALREADY_INACTIVE("Tenant is already inactive"),
-        CANNOT_ACTIVATE_INACTIVE("Cannot activate a deactivated tenant");
+        CANNOT_ACTIVATE_INACTIVE("Cannot activate a deactivated tenant"),
+        CANNOT_DELETE_ACTIVE("Cannot delete active tenant. Must suspend first");
 
         private final String message;
 
@@ -24,6 +33,7 @@ public sealed interface TenantError
             this.message = message;
         }
 
+        @Override
         public String message() {
             return message;
         }
@@ -33,7 +43,7 @@ public sealed interface TenantError
      * Errors related to tenant name operations.
      */
     enum NameError implements TenantError {
-        NAME_EMPTY("Name cannot be null or empty"),
+        EMPTY("Name cannot be null or empty"),
         NAME_TOO_SHORT("Name must be at least 2 characters long"),
         NAME_TOO_LONG("Name cannot exceed 100 characters"),
         NAME_SAME_AS_CURRENT("New name is the same as current name"),
@@ -45,6 +55,7 @@ public sealed interface TenantError
             this.message = message;
         }
 
+        @Override
         public String message() {
             return message;
         }
@@ -54,7 +65,7 @@ public sealed interface TenantError
      * Errors related to tenant subdomain operations.
      */
     enum SubdomainError implements TenantError {
-        SUBDOMAIN_EMPTY("Subdomain cannot be null or empty"),
+        EMPTY("Subdomain cannot be null or empty"),
         SUBDOMAIN_TOO_SHORT("Subdomain must be at least 3 characters long"),
         SUBDOMAIN_TOO_LONG("Subdomain cannot exceed 63 characters"),
         SUBDOMAIN_SAME_AS_CURRENT("New subdomain is the same as current subdomain"),
@@ -69,6 +80,7 @@ public sealed interface TenantError
             this.message = message;
         }
 
+        @Override
         public String message() {
             return message;
         }
@@ -87,6 +99,63 @@ public sealed interface TenantError
             this.message = message;
         }
 
+        @Override
+        public String message() {
+            return message;
+        }
+    }
+
+    /**
+     * Concurrency errors for optimistic locking.
+     */
+    enum ConcurrencyError implements TenantError {
+        VERSION_CONFLICT("Version conflict: The aggregate was modified by another transaction");
+
+        private final String message;
+
+        ConcurrencyError(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public String message() {
+            return message;
+        }
+    }
+
+    /**
+     * Persistence layer errors.
+     */
+    enum PersistenceError implements TenantError {
+        STORAGE_ERROR("Error storing or retrieving data"),
+        CONNECTION_ERROR("Database connection error");
+
+        private final String message;
+
+        PersistenceError(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public String message() {
+            return message;
+        }
+    }
+
+    /**
+     * Conflict errors (business rule violations).
+     */
+    enum ConflictError implements TenantError {
+        NAME_ALREADY_EXISTS("Tenant name already exists"),
+        SUBDOMAIN_ALREADY_EXISTS("Subdomain already exists");
+
+        private final String message;
+
+        ConflictError(String message) {
+            this.message = message;
+        }
+
+        @Override
         public String message() {
             return message;
         }

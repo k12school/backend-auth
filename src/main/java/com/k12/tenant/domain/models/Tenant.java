@@ -3,6 +3,7 @@ package com.k12.tenant.domain.models;
 import static com.k12.tenant.domain.models.error.TenantError.NameError.NAME_SAME_AS_CURRENT;
 import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_SAME_AS_CURRENT;
 import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.CANNOT_ACTIVATE_INACTIVE;
+import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.CANNOT_DELETE_ACTIVE;
 import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.TENANT_ALREADY_ACTIVE;
 import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.TENANT_ALREADY_INACTIVE;
 import static com.k12.tenant.domain.models.error.TenantError.TenantStatusError.TENANT_ALREADY_SUSPENDED;
@@ -13,6 +14,7 @@ import com.k12.common.domain.model.TenantId;
 import com.k12.tenant.domain.models.commands.TenantCommands;
 import com.k12.tenant.domain.models.commands.TenantCommands.ActivateTenant;
 import com.k12.tenant.domain.models.commands.TenantCommands.DeactivateTenant;
+import com.k12.tenant.domain.models.commands.TenantCommands.DeleteTenant;
 import com.k12.tenant.domain.models.commands.TenantCommands.SuspendTenant;
 import com.k12.tenant.domain.models.commands.TenantCommands.UpdateName;
 import com.k12.tenant.domain.models.commands.TenantCommands.UpdateSubdomain;
@@ -35,9 +37,10 @@ public record Tenant(
             case ActivateTenant activateTenant -> process(activateTenant);
             case SuspendTenant suspendTenant -> process(suspendTenant);
             case DeactivateTenant deactivateTenant -> process(deactivateTenant);
+            case DeleteTenant deleteTenant -> process(deleteTenant);
             case UpdateName updateName -> process(updateName);
             case UpdateSubdomain updateSubdomain -> process(updateSubdomain);
-            default -> throw new IllegalStateException("Unexpected value: " + command);
+            case TenantCommands.CreateTenant createTenant -> Result.failure(TenantError.ValidationError.INVALID_VALUE);
         };
     }
 
@@ -84,6 +87,19 @@ public record Tenant(
     }
 
     /**
+     * Deletes the tenant permanently. Tenant must be suspended first.
+     * @return Result containing TenantDeleted event on success, or TenantStatusError on failure
+     */
+    private Result<TenantEvents, TenantError> process(DeleteTenant command) {
+        if (this.status == TenantStatus.ACTIVE) {
+            return Result.failure(CANNOT_DELETE_ACTIVE);
+        }
+        return Result.success(new TenantEvents.TenantDeleted(
+                this.id(), now(), System.currentTimeMillis() // version placeholder
+                ));
+    }
+
+    /**
      * Updates the tenant's name with validation.
      * @return Result containing TenantNameUpdated event on success, or NameError on failure
      */
@@ -122,9 +138,9 @@ public record Tenant(
      * This is useful for event sourcing and replaying events.
      *
      * @param event The event to apply
-     * @return The updated tenant with the event applied
+     * @return Result containing updated tenant on success, or TenantError on failure
      */
-    public Tenant apply(TenantEvents event) {
+    public Result<Tenant, TenantError> apply(TenantEvents event) {
         return TenantReconstructor.applyEvent(this, event);
     }
 }

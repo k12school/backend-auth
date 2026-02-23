@@ -28,7 +28,7 @@ public final class TenantReconstructor {
             return Result.failure(TenantError.ValidationError.INVALID_VALUE);
         }
 
-        Tenant currentTenant = null;
+        Result<Tenant, TenantError> currentResult = null;
         TenantId tenantId = null;
 
         for (TenantEvents event : events) {
@@ -40,19 +40,26 @@ public final class TenantReconstructor {
                 }
             }
 
-            currentTenant = applyEvent(currentTenant, event);
+            var applyResult =
+                    applyEvent(currentResult != null && currentResult.isSuccess() ? currentResult.get() : null, event);
+
+            if (applyResult.isFailure()) {
+                return applyResult;
+            }
+
+            currentResult = applyResult;
 
             // Track tenantId after first event
-            if (tenantId == null && currentTenant != null) {
-                tenantId = currentTenant.id();
+            if (tenantId == null && currentResult.isSuccess()) {
+                tenantId = currentResult.get().id();
             }
         }
 
-        if (currentTenant == null) {
+        if (currentResult == null || currentResult.isFailure()) {
             return Result.failure(TenantError.ValidationError.INVALID_VALUE);
         }
 
-        return Result.success(currentTenant);
+        return currentResult;
     }
 
     /**
@@ -76,7 +83,7 @@ public final class TenantReconstructor {
             return Result.failure(TenantError.ValidationError.VALUE_REQUIRED);
         }
 
-        Tenant currentTenant = null;
+        Result<Tenant, TenantError> currentResult = null;
         TenantId tenantId = null;
         long expectedVersion = 1;
 
@@ -95,31 +102,38 @@ public final class TenantReconstructor {
                 }
             }
 
-            currentTenant = applyEvent(currentTenant, event);
+            var applyResult =
+                    applyEvent(currentResult != null && currentResult.isSuccess() ? currentResult.get() : null, event);
 
-            if (tenantId == null && currentTenant != null) {
-                tenantId = currentTenant.id();
+            if (applyResult.isFailure()) {
+                return applyResult;
+            }
+
+            currentResult = applyResult;
+
+            if (tenantId == null && currentResult.isSuccess()) {
+                tenantId = currentResult.get().id();
             }
 
             expectedVersion++;
         }
 
-        if (currentTenant == null) {
+        if (currentResult == null || currentResult.isFailure()) {
             return Result.failure(TenantError.ValidationError.INVALID_VALUE);
         }
 
-        return Result.success(currentTenant);
+        return currentResult;
     }
 
     /**
      * Applies a single delta event to a Tenant, returning the updated Tenant.
-     * Handles incremental state changes.
+     * Handles incremental state changes using ROP pattern.
      *
      * @param tenant Current tenant state (null for TenantCreated)
      * @param event Event to apply
-     * @return Updated tenant with the event applied
+     * @return Result containing updated tenant on success, or TenantError on failure
      */
-    public static Tenant applyEvent(Tenant tenant, TenantEvents event) {
+    public static Result<Tenant, TenantError> applyEvent(Tenant tenant, TenantEvents event) {
         return switch (event) {
             // TenantCreated: Creates new tenant from initial state
             case TenantEvents.TenantCreated(
@@ -128,23 +142,27 @@ public final class TenantReconstructor {
                     var subdomain,
                     var status,
                     var createdAt,
-                    var version) -> new Tenant(tenantId, name, subdomain, status);
+                    var version) -> Result.success(new Tenant(tenantId, name, subdomain, status));
 
             // TenantSuspended: Changes status to SUSPENDED
             case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version)
-            when tenant != null -> tenant.withStatus(TenantStatus.SUSPENDED);
+            when tenant != null -> Result.success(tenant.withStatus(TenantStatus.SUSPENDED));
 
             // TenantActivated: Changes status to ACTIVE
             case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version)
-            when tenant != null -> tenant.withStatus(TenantStatus.ACTIVE);
+            when tenant != null -> Result.success(tenant.withStatus(TenantStatus.ACTIVE));
 
             // TenantDeactivated: Changes status to INACTIVE
             case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version)
-            when tenant != null -> tenant.withStatus(TenantStatus.INACTIVE);
+            when tenant != null -> Result.success(tenant.withStatus(TenantStatus.INACTIVE));
+
+            // TenantDeleted: Marks tenant as deleted (status remains unchanged)
+            case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version)
+            when tenant != null -> Result.success(tenant);
 
             // TenantNameUpdated: Changes name
             case TenantEvents.TenantNameUpdated(var tenantId, var newName, var previousName, var updatedAt, var version)
-            when tenant != null -> tenant.withName(newName);
+            when tenant != null -> Result.success(tenant.withName(newName));
 
             // TenantSubdomainUpdated: Changes subdomain
             case TenantEvents.TenantSubdomainUpdated(
@@ -153,10 +171,10 @@ public final class TenantReconstructor {
                     var previousSubdomain,
                     var updatedAt,
                     var version)
-            when tenant != null -> tenant.withSubdomain(newSubdomain);
+            when tenant != null -> Result.success(tenant.withSubdomain(newSubdomain));
 
             // Handle null tenant case (shouldn't happen with proper event stream)
-            default -> throw new IllegalStateException("Cannot apply event without existing tenant: " + event);
+            default -> Result.failure(TenantError.ValidationError.INVALID_VALUE);
         };
     }
 
@@ -175,6 +193,7 @@ public final class TenantReconstructor {
             case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version) -> tenantId;
             case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version) -> tenantId;
             case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version) -> tenantId;
+            case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version) -> tenantId;
             case TenantEvents.TenantNameUpdated(
                     var tenantId,
                     var newName,
@@ -205,6 +224,7 @@ public final class TenantReconstructor {
             case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, long version) -> version;
             case TenantEvents.TenantActivated(var tenantId, var activatedAt, long version) -> version;
             case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, long version) -> version;
+            case TenantEvents.TenantDeleted(var tenantId, var deletedAt, long version) -> version;
             case TenantEvents.TenantNameUpdated(
                     var tenantId,
                     var newName,

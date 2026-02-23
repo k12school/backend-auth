@@ -1,5 +1,15 @@
 package com.k12.tenant.domain.models;
 
+import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.EMPTY;
+import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_CANNOT_START_OR_END_WITH_HYPHEN;
+import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_HAS_CONSECUTIVE_HYPHENS;
+import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_INVALID_FORMAT;
+import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_TOO_LONG;
+import static com.k12.tenant.domain.models.error.TenantError.SubdomainError.SUBDOMAIN_TOO_SHORT;
+
+import com.k12.common.domain.model.Result;
+import com.k12.tenant.domain.models.error.TenantError;
+
 /**
  * Value object representing a tenant's subdomain.
  */
@@ -10,35 +20,33 @@ public record Subdomain(String value) {
     private static final String VALID_SUBDOMAIN_PATTERN = "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$";
 
     /**
-     * Factory method to create a validated Subdomain.
+     * Factory method to create a validated Subdomain using ROP pattern.
      *
      * @param value The subdomain value
-     * @return A validated Subdomain
-     * @throws IllegalArgumentException if validation fails
+     * @return Result containing Subdomain on success, or TenantError on failure
      */
-    public static Subdomain of(String value) {
+    public static Result<Subdomain, TenantError> of(String value) {
         if (value == null || value.trim().isEmpty()) {
-            throw new IllegalArgumentException("Subdomain cannot be null or empty");
+            return Result.failure(EMPTY);
         }
         String normalized = value.toLowerCase().trim();
 
         if (normalized.length() < MIN_LENGTH) {
-            throw new IllegalArgumentException("Subdomain must be at least " + MIN_LENGTH + " characters long");
+            return Result.failure(SUBDOMAIN_TOO_SHORT);
         }
         if (normalized.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException("Subdomain cannot exceed " + MAX_LENGTH + " characters");
+            return Result.failure(SUBDOMAIN_TOO_LONG);
         }
         if (!normalized.matches(VALID_SUBDOMAIN_PATTERN)) {
-            throw new IllegalArgumentException(
-                    "Subdomain contains invalid characters (only lowercase letters, numbers, and hyphens allowed)");
+            return Result.failure(SUBDOMAIN_INVALID_FORMAT);
         }
         if (normalized.contains("--")) {
-            throw new IllegalArgumentException("Subdomain cannot have consecutive hyphens");
+            return Result.failure(SUBDOMAIN_HAS_CONSECUTIVE_HYPHENS);
         }
         if (normalized.startsWith("-") || normalized.endsWith("-")) {
-            throw new IllegalArgumentException("Subdomain cannot start or end with a hyphen");
+            return Result.failure(SUBDOMAIN_CANNOT_START_OR_END_WITH_HYPHEN);
         }
 
-        return new Subdomain(normalized);
+        return Result.success(new Subdomain(normalized));
     }
 }

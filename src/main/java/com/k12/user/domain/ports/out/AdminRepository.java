@@ -10,7 +10,7 @@ import java.util.Set;
 /**
  * Repository interface for Admin aggregates.
  */
-public interface    AdminRepository {
+public interface AdminRepository {
 
     /**
      * Saves an admin aggregate.

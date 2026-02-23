@@ -16,6 +16,7 @@ public sealed interface TenantEvents
                 TenantEvents.TenantSuspended,
                 TenantEvents.TenantActivated,
                 TenantEvents.TenantDeactivated,
+                TenantEvents.TenantDeleted,
                 TenantEvents.TenantNameUpdated,
                 TenantEvents.TenantSubdomainUpdated {
 
@@ -46,6 +47,11 @@ public sealed interface TenantEvents
      * Tenant was deactivated - only needs tenantId.
      */
     record TenantDeactivated(TenantId tenantId, Instant deactivatedAt, long version) implements TenantEvents {}
+
+    /**
+     * Tenant was deleted (permanently) - only needs tenantId.
+     */
+    record TenantDeleted(TenantId tenantId, Instant deletedAt, long version) implements TenantEvents {}
 
     /**
      * Tenant name was updated - contains both old and new name.

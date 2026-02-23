@@ -102,6 +102,26 @@ public sealed interface Result<T, E> permits Result.Success, Result.Failure {
     }
 
     /**
+     * Folds the result into a single value using the provided functions.
+     * This is the core operation of Railway Oriented Programming.
+     *
+     * @param onSuccess Function to apply if this is a success
+     * @param onFailure Function to apply if this is a failure
+     * @param <R> The result type
+     * @return The result of applying the appropriate function
+     */
+    @SuppressWarnings("unchecked")
+    default <R> R fold(java.util.function.Function<T, R> onSuccess, java.util.function.Function<E, R> onFailure) {
+        if (isSuccess()) {
+            T value = ((Success<T, E>) this).value();
+            return onSuccess.apply(value);
+        } else {
+            E error = ((Failure<T, E>) this).error();
+            return onFailure.apply(error);
+        }
+    }
+
+    /**
      * A successful result containing a value.
      */
     record Success<T, E>(T value) implements Result<T, E> {}
