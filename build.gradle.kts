@@ -62,6 +62,7 @@ dependencies {
     testImplementation("org.mockito:mockito-junit-jupiter:5.21.0")
     testImplementation("com.tngtech.archunit:archunit:1.4.1")
     testImplementation("io.quarkus:quarkus-junit5")
+    testImplementation("io.rest-assured:rest-assured:5.5.1")
     testCompileOnly("org.projectlombok:lombok:1.18.42")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.42")
 }

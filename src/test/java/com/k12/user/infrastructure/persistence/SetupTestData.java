@@ -32,12 +32,72 @@ public class SetupTestData {
     AgroalDataSource dataSource;
 
     /**
+     * Sets up a test tenant.
+     * This must be called before setting up test users.
+     */
+    private void setupTestTenant(DSLContext ctx, UUID tenantId) {
+        // Check if tenant already exists
+        Long existingTenantCount = ctx.selectCount()
+                .from(com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS)
+                .where(com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.ID.eq(tenantId))
+                .fetchOne(0, Long.class);
+
+        if (existingTenantCount != null && existingTenantCount > 0) {
+            System.out.println("Test tenant already exists, skipping setup");
+            return;
+        }
+
+        // Insert into tenant_events table
+        int tenantEventsInserted = ctx.insertInto(
+                        com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS,
+                        com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS.TENANT_ID,
+                        com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS.EVENT_TYPE,
+                        com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS.EVENT_DATA,
+                        com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS.VERSION,
+                        com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS.OCCURRED_AT)
+                .values(
+                        tenantId,
+                        "TenantCreated",
+                        serializeTenantCreatedEvent(tenantId),
+                        1L,
+                        java.time.OffsetDateTime.now())
+                .execute();
+
+        // Insert into tenants projection table
+        int tenantsInserted = ctx.insertInto(
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.ID,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.NAME,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.SUBDOMAIN,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.STATUS,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.VERSION,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.CREATED_AT,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.UPDATED_AT)
+                .values(
+                        tenantId,
+                        "Test Tenant",
+                        "test",
+                        "ACTIVE",
+                        1L,
+                        java.time.OffsetDateTime.now(),
+                        java.time.OffsetDateTime.now())
+                .execute();
+
+        System.out.println("Test tenant data inserted successfully: " + tenantEventsInserted + " events, "
+                + tenantsInserted + " tenants");
+    }
+
+    /**
      * Sets up the test user data.
      * This should be called before running integration tests.
      */
     public void setupTestUser() {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
         UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        UUID tenantId = UUID.fromString("660e8400-e29b-41d4-a716-446655440001");
+
+        // Setup tenant first
+        setupTestTenant(ctx, tenantId);
 
         // Check if user already exists in users table
         Long existingUserCount = ctx.selectCount()
@@ -54,7 +114,7 @@ public class SetupTestData {
         UserEvents.UserCreated event = new UserEvents.UserCreated(
                 new UserId(userId),
                 new EmailAddress("admin@k12.com"),
-                new PasswordHash("$2b$12$UJ3TGU9.Po1qYDEBuNgeout1LgBuxDLgfxebbyoAPmewn5Evj0Q.6"),
+                new PasswordHash("$2b$12$Rc0dj3Wk0R6QhLlAb9Ocoeq5u1DcbIOrjlx3dY93vtJwJ1UgVE7aS"),
                 new HashSet<>(java.util.Set.of(UserRole.SUPER_ADMIN)),
                 UserStatus.ACTIVE,
                 new UserName("Super Administrator"),
@@ -86,17 +146,19 @@ public class SetupTestData {
                         com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS.NAME,
                         com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS.VERSION,
                         com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS.CREATED_AT,
-                        com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS.UPDATED_AT)
+                        com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS.UPDATED_AT,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS.TENANT_ID)
                 .values(
                         userId,
                         "admin@k12.com",
-                        "$2b$12$UJ3TGU9.Po1qYDEBuNgeout1LgBuxDLgfxebbyoAPmewn5Evj0Q.6",
+                        "$2b$12$Rc0dj3Wk0R6QhLlAb9Ocoeq5u1DcbIOrjlx3dY93vtJwJ1UgVE7aS",
                         "SUPER_ADMIN",
                         "ACTIVE",
                         "Super Administrator",
                         1L,
                         java.time.OffsetDateTime.now(),
-                        java.time.OffsetDateTime.now())
+                        java.time.OffsetDateTime.now(),
+                        tenantId)
                 .execute();
 
         System.out.println(
@@ -155,6 +217,59 @@ public class SetupTestData {
             return baos.toByteArray();
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize event", e);
+        }
+    }
+
+    /**
+     * Serializes a TenantCreated event for testing.
+     */
+    private byte[] serializeTenantCreatedEvent(UUID tenantId) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                Output output = new Output(baos)) {
+
+            Kryo kryo = new Kryo();
+
+            // Register UUID with custom serializer
+            kryo.register(UUID.class, new KryoUuidSerializer());
+
+            // Register common types
+            kryo.register(String.class);
+            kryo.register(long.class);
+            kryo.register(int.class);
+            kryo.register(boolean.class);
+
+            // Register Java time types
+            kryo.register(Instant.class);
+
+            // Register Tenant value objects
+            kryo.register(com.k12.common.domain.model.TenantId.class);
+            kryo.register(com.k12.tenant.domain.models.TenantName.class);
+            kryo.register(com.k12.tenant.domain.models.Subdomain.class);
+            kryo.register(com.k12.tenant.domain.models.TenantStatus.class);
+            kryo.register(HashSet.class);
+
+            // Register TenantEvent classes
+            kryo.register(com.k12.tenant.domain.models.events.TenantEvents.TenantCreated.class, 300);
+
+            // Configure settings
+            kryo.setReferences(false);
+            kryo.setRegistrationRequired(true);
+
+            // Create TenantCreated event
+            com.k12.tenant.domain.models.events.TenantEvents.TenantCreated event =
+                    new com.k12.tenant.domain.models.events.TenantEvents.TenantCreated(
+                            new com.k12.common.domain.model.TenantId(tenantId.toString()),
+                            new com.k12.tenant.domain.models.TenantName("Test Tenant"),
+                            new com.k12.tenant.domain.models.Subdomain("test"),
+                            com.k12.tenant.domain.models.TenantStatus.ACTIVE,
+                            Instant.now(),
+                            1L);
+
+            kryo.writeClassAndObject(output, event);
+            output.flush();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to serialize tenant event", e);
         }
     }
 
