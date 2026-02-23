@@ -5,6 +5,8 @@ plugins {
     id("com.diffplug.spotless") version "8.2.1"
 }
 
+apply(from = "jooq.gradle")
+
 group = "com.k12-school"
 version = "1.0-SNAPSHOT"
 

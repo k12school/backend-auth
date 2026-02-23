@@ -1,0 +1,27 @@
+// See https://github.com/etiennestuder/gradle-jooq-plugin
+jooq {
+    configurations {
+        main {
+            generationTool {
+                logging = 'WARN'
+                jdbc {
+                    driver = 'org.postgresql.Driver'
+                    url = 'jdbc:postgresql://localhost:15432/k12_db'
+                    user = 'k12_user'
+                    password = 'k12_password'
+                }
+                generator {
+                    database {
+                        name = 'org.jooq.meta.postgres.PostgresDatabase'
+                        includes = '.*'
+                        excludes = 'flyway_schema_history | information_schema\\..* | pg_catalog\\..*'
+                    }
+                    target {
+                        directory = 'build/generated/jooq'
+                        packageName = 'com.k12.backend.infrastructure.jooq'
+                    }
+                }
+            }
+        }
+    }
+}
