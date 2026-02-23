@@ -234,33 +234,20 @@ public class TenantRepositoryImpl implements TenantRepository {
                         .onConflict(TENANTS.ID)
                         .doNothing()
                         .execute();
-                break;
             }
-            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version) -> {
+            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version) ->
                 updateTenantWithVersionCheck(ctx, UUID.fromString(tenantId.value()), version, suspendedAt, "SUSPENDED");
-                break;
-            }
-            case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version) -> {
+            case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version) ->
                 updateTenantWithVersionCheck(ctx, UUID.fromString(tenantId.value()), version, activatedAt, "ACTIVE");
-                break;
-            }
-            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version) -> {
+            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version) ->
                 updateTenantWithVersionCheck(
                         ctx, UUID.fromString(tenantId.value()), version, deactivatedAt, "INACTIVE");
-                break;
-            }
             case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version) -> {
                 ctx.deleteFrom(TENANTS)
                         .where(TENANTS.ID.eq(UUID.fromString(tenantId.value())))
                         .execute();
-                break;
             }
-            case TenantEvents.TenantNameUpdated(
-                    var tenantId,
-                    var newName,
-                    var previousName,
-                    var updatedAt,
-                    var version) -> {
+            case TenantEvents.TenantNameUpdated(var tenantId, var newName, var _, var updatedAt, var version) -> {
                 OffsetDateTime timestamp = OffsetDateTime.ofInstant(updatedAt, ZoneOffset.UTC);
                 ctx.update(TENANTS)
                         .set(TENANTS.NAME, newName.value())
@@ -268,12 +255,11 @@ public class TenantRepositoryImpl implements TenantRepository {
                         .set(TENANTS.UPDATED_AT, timestamp)
                         .where(TENANTS.ID.eq(UUID.fromString(tenantId.value())))
                         .execute();
-                break;
             }
             case TenantEvents.TenantSubdomainUpdated(
                     var tenantId,
                     var newSubdomain,
-                    var previousSubdomain,
+                    var _,
                     var updatedAt,
                     var version) -> {
                 OffsetDateTime timestamp = OffsetDateTime.ofInstant(updatedAt, ZoneOffset.UTC);
@@ -283,7 +269,6 @@ public class TenantRepositoryImpl implements TenantRepository {
                         .set(TENANTS.UPDATED_AT, timestamp)
                         .where(TENANTS.ID.eq(UUID.fromString(tenantId.value())))
                         .execute();
-                break;
             }
         }
     }
@@ -311,27 +296,15 @@ public class TenantRepositoryImpl implements TenantRepository {
 
     private UUID extractTenantIdUUID(TenantEvents event) {
         return switch (event) {
-            case TenantEvents.TenantCreated(
-                    var tenantId,
-                    var name,
-                    var subdomain,
-                    var status,
-                    var createdAt,
-                    var version) -> UUID.fromString(tenantId.value());
-            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version) ->
+            case TenantEvents.TenantCreated(var tenantId, var _, var _, var _, var _, var _) ->
                 UUID.fromString(tenantId.value());
-            case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version) ->
-                UUID.fromString(tenantId.value());
-            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version) ->
-                UUID.fromString(tenantId.value());
+            case TenantEvents.TenantSuspended(var tenantId, var _, var _) -> UUID.fromString(tenantId.value());
+            case TenantEvents.TenantActivated(var tenantId, var _, var _) -> UUID.fromString(tenantId.value());
+            case TenantEvents.TenantDeactivated(var tenantId, var _, var _) -> UUID.fromString(tenantId.value());
             case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version) ->
                 UUID.fromString(tenantId.value());
-            case TenantEvents.TenantNameUpdated(
-                    var tenantId,
-                    var newName,
-                    var previousName,
-                    var updatedAt,
-                    var version) -> UUID.fromString(tenantId.value());
+            case TenantEvents.TenantNameUpdated(var tenantId, var _, var _, var _, var _) ->
+                UUID.fromString(tenantId.value());
             case TenantEvents.TenantSubdomainUpdated(
                     var tenantId,
                     var newSubdomain,
