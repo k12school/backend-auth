@@ -28,59 +28,11 @@ import java.util.Set;
  * }
  * }</pre>
  */
-public class JWTPrincipal implements Principal {
-
-    private final String userId;
-    private final String email;
-    private final Set<String> roles;
-    private final TenantId tenantId;
-
-    public JWTPrincipal(String userId, String email, Set<String> roles, TenantId tenantId) {
-        this.userId = userId;
-        this.email = email;
-        this.roles = roles != null ? roles : Set.of();
-        this.tenantId = tenantId;
-    }
+public record JWTPrincipal(String userId, String email, Set<String> roles, TenantId tenantId) implements Principal {
 
     @Override
     public String getName() {
         return userId;
-    }
-
-    /**
-     * Get the user ID from JWT subject claim.
-     *
-     * @return User ID (UUID string)
-     */
-    public String getUserId() {
-        return userId;
-    }
-
-    /**
-     * Get the user email from JWT email claim.
-     *
-     * @return User email address
-     */
-    public String getEmail() {
-        return email;
-    }
-
-    /**
-     * Get the user roles from JWT roles claim.
-     *
-     * @return Set of role names (e.g., SUPER_ADMIN, TEACHER)
-     */
-    public Set<String> getRoles() {
-        return roles;
-    }
-
-    /**
-     * Get the tenant ID from JWT tenantId claim.
-     *
-     * @return Tenant ID or null if not present
-     */
-    public TenantId getTenantId() {
-        return tenantId;
     }
 
     /**

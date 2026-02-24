@@ -1,7 +1,6 @@
 package com.k12.infrastructure.security;
 
 import com.k12.common.domain.model.TenantId;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -25,38 +24,17 @@ import java.util.Set;
  *
  * <p>Note: This class is produced via {@link AuthContextProducer} as a request-scoped bean.
  */
-public class AuthContext {
-
-    private final Optional<TenantId> tenantId;
-    private final Set<String> roles;
+public record AuthContext(TenantId tenantId, Set<String> roles) {
 
     /**
      * Creates a new AuthContext with tenant and role information.
      *
      * @param tenantId The tenant ID (can be null for users without tenant context)
-     * @param roles The set of roles (can be null, will be treated as empty set)
+     * @param roles    The set of roles (can be null, will be treated as empty set)
      */
     public AuthContext(TenantId tenantId, Set<String> roles) {
-        this.tenantId = Optional.ofNullable(tenantId);
+        this.tenantId = tenantId;
         this.roles = roles != null ? Set.copyOf(roles) : Set.of();
-    }
-
-    /**
-     * Gets the tenant ID for the current request.
-     *
-     * @return Optional containing TenantId, or empty if not present
-     */
-    public Optional<TenantId> getTenantId() {
-        return tenantId;
-    }
-
-    /**
-     * Gets the roles for the current request.
-     *
-     * @return Set of role names (never null, may be empty)
-     */
-    public Set<String> getRoles() {
-        return roles;
     }
 
     /**
@@ -76,6 +54,7 @@ public class AuthContext {
      * @return true if this context belongs to the specified tenant
      */
     public boolean isTenant(TenantId id) {
-        return id != null && tenantId.isPresent() && tenantId.get().equals(id);
+
+        return tenantId() != null && tenantId().isSameTenantId(id);
     }
 }

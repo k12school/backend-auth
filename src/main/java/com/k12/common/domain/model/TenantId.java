@@ -33,4 +33,8 @@ public record TenantId(String value) {
     public static TenantId of(String value) {
         return new TenantId(value);
     }
+
+    public boolean isSameTenantId(TenantId tenantId) {
+        return tenantId != null && tenantId.value().equalsIgnoreCase(value());
+    }
 }

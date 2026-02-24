@@ -32,7 +32,7 @@ public class JWTSecurityContext implements jakarta.ws.rs.core.SecurityContext {
 
     @Override
     public boolean isUserInRole(String role) {
-        return principal.getRoles().contains(role);
+        return principal.roles().contains(role);
     }
 
     @Override

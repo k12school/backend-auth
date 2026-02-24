@@ -2,6 +2,7 @@ package com.k12.infrastructure.security;
 
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.enterprise.inject.Produces;
+import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.Context;
 
 /**
@@ -11,7 +12,7 @@ import jakarta.ws.rs.core.Context;
 public class AuthContextProducer {
 
     @Context
-    private jakarta.ws.rs.container.ContainerRequestContext requestContext;
+    private ContainerRequestContext requestContext;
 
     @Produces
     @RequestScoped

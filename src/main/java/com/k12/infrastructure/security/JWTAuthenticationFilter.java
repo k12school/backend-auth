@@ -104,27 +104,28 @@ public class JWTAuthenticationFilter implements ContainerRequestFilter {
      */
     private JwtClaims validateAndParseToken(String token) throws Exception {
         // Read public key from classpath
-        var publicKeyStream = getClass().getResourceAsStream(PUBLIC_KEY_LOCATION);
-        if (publicKeyStream == null) {
-            throw new IllegalStateException("Public key not found at " + PUBLIC_KEY_LOCATION);
+        try (var publicKeyStream = getClass().getResourceAsStream(PUBLIC_KEY_LOCATION)) {
+            if (publicKeyStream == null) {
+                throw new IllegalStateException("Public key not found at " + PUBLIC_KEY_LOCATION);
+            }
+
+            String publicKeyPem = new String(publicKeyStream.readAllBytes());
+
+            // Build JWT consumer with RSA public key verification
+            JwtConsumer consumer = new JwtConsumerBuilder()
+                    .setSkipSignatureVerification() // We'll verify with jose4j manually
+                    .setRequireExpirationTime()
+                    .setAllowedClockSkewInSeconds(30)
+                    .setRequireSubject()
+                    .build();
+
+            JwtClaims claims = consumer.processToClaims(token);
+
+            // Additional signature verification could be added here if needed
+            // For now, Quarkus handles RSA verification via mp.jwt.verify.publickey.location
+
+            return claims;
         }
-
-        String publicKeyPem = new String(publicKeyStream.readAllBytes());
-
-        // Build JWT consumer with RSA public key verification
-        JwtConsumer consumer = new JwtConsumerBuilder()
-                .setSkipSignatureVerification() // We'll verify with jose4j manually
-                .setRequireExpirationTime()
-                .setAllowedClockSkewInSeconds(30)
-                .setRequireSubject()
-                .build();
-
-        JwtClaims claims = consumer.processToClaims(token);
-
-        // Additional signature verification could be added here if needed
-        // For now, Quarkus handles RSA verification via mp.jwt.verify.publickey.location
-
-        return claims;
     }
 
     /**

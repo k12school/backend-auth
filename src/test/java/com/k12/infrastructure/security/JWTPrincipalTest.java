@@ -13,10 +13,10 @@ class JWTPrincipalTest {
         TenantId tenantId = TenantId.of("tenant-123");
         JWTPrincipal principal = new JWTPrincipal("user-123", "user@example.com", Set.of("ADMIN"), tenantId);
 
-        assertEquals("user-123", principal.getUserId());
-        assertEquals("user@example.com", principal.getEmail());
+        assertEquals("user-123", principal.userId());
+        assertEquals("user@example.com", principal.email());
         assertEquals("user-123", principal.getName());
-        assertEquals(tenantId, principal.getTenantId());
+        assertEquals(tenantId, principal.tenantId());
         assertTrue(principal.hasRole("ADMIN"));
     }
 
@@ -24,8 +24,8 @@ class JWTPrincipalTest {
     void shouldHandleNullTenantId() {
         JWTPrincipal principal = new JWTPrincipal("user-123", "user@example.com", Set.of("ADMIN"), null);
 
-        assertEquals("user-123", principal.getUserId());
-        assertNull(principal.getTenantId());
+        assertEquals("user-123", principal.userId());
+        assertNull(principal.tenantId());
     }
 
     @Test
@@ -33,7 +33,7 @@ class JWTPrincipalTest {
         TenantId tenantId = TenantId.of("tenant-123");
         JWTPrincipal principal = new JWTPrincipal("user-123", "user@example.com", null, tenantId);
 
-        assertTrue(principal.getRoles().isEmpty());
+        assertTrue(principal.roles().isEmpty());
     }
 
     @Test
@@ -41,8 +41,8 @@ class JWTPrincipalTest {
         TenantId tenantId = TenantId.of("tenant-456");
         JWTPrincipal principal = new JWTPrincipal("user-123", "user@example.com", Set.of(), tenantId);
 
-        assertNotNull(principal.getTenantId());
-        assertTrue(principal.getTenantId() instanceof TenantId);
-        assertEquals("tenant-456", principal.getTenantId().value());
+        assertNotNull(principal.tenantId());
+        assertTrue(principal.tenantId() instanceof TenantId);
+        assertEquals("tenant-456", principal.tenantId().value());
     }
 }

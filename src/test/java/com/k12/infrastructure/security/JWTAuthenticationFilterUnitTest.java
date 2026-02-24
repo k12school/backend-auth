@@ -38,9 +38,9 @@ class JWTAuthenticationFilterUnitTest {
         assertNotNull(securityContext);
         JWTPrincipal principal = (JWTPrincipal) securityContext.getUserPrincipal();
         assertNotNull(principal);
-        assertNotNull(principal.getTenantId());
-        assertTrue(principal.getTenantId() instanceof TenantId);
-        assertEquals("tenant-456", principal.getTenantId().value());
+        assertNotNull(principal.tenantId());
+        assertTrue(principal.tenantId() instanceof TenantId);
+        assertEquals("tenant-456", principal.tenantId().value());
     }
 
     @Test
@@ -52,8 +52,8 @@ class JWTAuthenticationFilterUnitTest {
 
         AuthContext authContext = (AuthContext) requestContext.getProperty("auth.context");
         assertNotNull(authContext);
-        assertTrue(authContext.getTenantId().isPresent());
-        assertEquals("tenant-456", authContext.getTenantId().get().value());
+        assertTrue(authContext.tenantId().isPresent());
+        assertEquals("tenant-456", authContext.tenantId().get().value());
         assertTrue(authContext.hasRole("ADMIN"));
     }
 
@@ -86,10 +86,10 @@ class JWTAuthenticationFilterUnitTest {
         SecurityContext securityContext = requestContext.getSecurityContext();
         JWTPrincipal principal = (JWTPrincipal) securityContext.getUserPrincipal();
 
-        assertNull(principal.getTenantId());
+        assertNull(principal.tenantId());
 
         AuthContext authContext = (AuthContext) requestContext.getProperty("auth.context");
-        assertTrue(authContext.getTenantId().isEmpty());
+        assertTrue(authContext.tenantId().isEmpty());
     }
 
     // Helper methods for unit tests

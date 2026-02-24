@@ -7,6 +7,7 @@ import com.k12.tenant.infrastructure.rest.dto.CreateTenantRequest;
 import com.k12.tenant.infrastructure.rest.dto.ErrorResponse;
 import com.k12.tenant.infrastructure.rest.dto.TenantResponse;
 import com.k12.tenant.infrastructure.rest.mapper.ErrorResponseMapper;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -25,6 +26,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 @Consumes(MediaType.APPLICATION_JSON)
 @RequiredArgsConstructor
 @Tag(name = "Tenants", description = "Operations for managing tenants")
+@RolesAllowed("SUPER_ADMIN")
 public class TenantResource {
 
     private final TenantService tenantService;
@@ -42,6 +44,7 @@ public class TenantResource {
                 responseCode = "400",
                 description = "Invalid request data",
                 content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @APIResponse(responseCode = "403", description = "Forbidden - SUPER_ADMIN role required"),
         @APIResponse(
                 responseCode = "409",
                 description = "Tenant with the same subdomain already exists",
@@ -62,6 +65,7 @@ public class TenantResource {
                 responseCode = "200",
                 description = "Tenant found",
                 content = @Content(schema = @Schema(implementation = TenantResponse.class))),
+        @APIResponse(responseCode = "403", description = "Forbidden - SUPER_ADMIN role required"),
         @APIResponse(
                 responseCode = "404",
                 description = "Tenant not found",
@@ -88,6 +92,7 @@ public class TenantResource {
                 responseCode = "200",
                 description = "Tenant activated successfully",
                 content = @Content(schema = @Schema(implementation = TenantResource.TenantEventDTO.class))),
+        @APIResponse(responseCode = "403", description = "Forbidden - SUPER_ADMIN role required"),
         @APIResponse(
                 responseCode = "404",
                 description = "Tenant not found",
@@ -117,6 +122,7 @@ public class TenantResource {
                 responseCode = "200",
                 description = "Tenant suspended successfully",
                 content = @Content(schema = @Schema(implementation = TenantResource.TenantEventDTO.class))),
+        @APIResponse(responseCode = "403", description = "Forbidden - SUPER_ADMIN role required"),
         @APIResponse(
                 responseCode = "404",
                 description = "Tenant not found",
@@ -141,6 +147,7 @@ public class TenantResource {
     @Operation(summary = "Delete a tenant", description = "Deletes a tenant with the given ID")
     @APIResponses({
         @APIResponse(responseCode = "204", description = "Tenant deleted successfully"),
+        @APIResponse(responseCode = "403", description = "Forbidden - SUPER_ADMIN role required"),
         @APIResponse(
                 responseCode = "404",
                 description = "Tenant not found",
