@@ -536,7 +536,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 Add new method to `src/main/java/com/k12/user/infrastructure/rest/resource/SecurityTestResource.java`:
 
 ```java
-import com.k12.infrastructure.security.AuthContext;
+import com.k12.common.infrastructure.security.AuthContext;
 import com.k12.common.domain.model.TenantId;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Context;
@@ -839,7 +839,7 @@ Update the bullet points:
 
 ```markdown
 ### 3. JWTPrincipal
-**Location:** `com.k12.infrastructure.security.JWTPrincipal`
+**Location:** `com.k12.common.infrastructure.security.JWTPrincipal`
 
 Principal implementation containing:
 - `getUserId()` - User ID from JWT subject

@@ -12,6 +12,7 @@ import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
@@ -22,12 +23,13 @@ public class TokenService {
     public static String generateToken(User user, String tenantId) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(TOKEN_VALIDITY_HOURS * 3600);
-        String roles = user.userRole().stream().map(UserRole::name).collect(Collectors.joining(","));
+        Set<String> roles = user.userRole().stream().map(UserRole::name).collect(Collectors.toSet());
 
         return Jwt.claims()
                 .subject(user.userId().value().toString())
                 .claim("email", user.emailAddress().value())
-                .claim("roles", roles)
+                .claim("groups", roles) // TEMPORARY: Test with "groups" claim
+                .claim("roles", roles) // Keep roles for our SecurityContext
                 .claim("tenantId", tenantId)
                 .issuedAt(now)
                 .expiresAt(exp)

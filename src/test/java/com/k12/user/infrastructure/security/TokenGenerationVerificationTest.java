@@ -78,11 +78,12 @@ public class TokenGenerationVerificationTest {
         System.out.println("   ✓ email: " + email);
         assertEquals("admin@k12.com", email);
 
-        // Verify roles
-        assertTrue(payloadJson.contains("\"roles\""), "Must contain roles claim");
-        String roles = TokenService.extractClaim(token, "roles");
-        System.out.println("   ✓ roles: " + roles);
-        assertNotNull(roles);
+        // Verify roles (now a JSON array)
+        assertTrue(payloadJson.contains("\"roles\":["), "Must contain roles claim as array");
+        assertTrue(payloadJson.contains("\"groups\":["), "Must contain groups claim as array");
+        assertTrue(payloadJson.contains("SUPER_ADMIN"), "Must contain SUPER_ADMIN role");
+        System.out.println("   ✓ roles: [SUPER_ADMIN] (JSON array)");
+        System.out.println("   ✓ groups: [SUPER_ADMIN] (JSON array)");
 
         // Verify tenantId
         assertTrue(payloadJson.contains("\"tenantId\""), "Must contain tenantId claim");
@@ -136,7 +137,8 @@ public class TokenGenerationVerificationTest {
         System.out.println("✓ All required claims present:");
         System.out.println("  - sub (user ID)");
         System.out.println("  - email");
-        System.out.println("  - roles");
+        System.out.println("  - roles (JSON array for @RolesAllowed)");
+        System.out.println("  - groups (JSON array for Quarkus Security)");
         System.out.println("  - tenantId");
         System.out.println("  - iss (issuer)");
         System.out.println("  - iat (issued at)");

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.k12.common.domain.model.UserId;
 import com.k12.user.domain.models.*;
+import java.util.Base64;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -34,11 +35,21 @@ public class TokenServiceTest {
     }
 
     @Test
-    void shouldIncludeRolesInToken() {
+    void shouldIncludeRolesAsArrayInToken() {
         User user = createTestUser();
         String token = TokenService.generateToken(user, "test-tenant");
-        String roles = TokenService.extractClaim(token, "roles");
-        assertNotNull(roles);
+
+        // Decode JWT payload
+        String[] parts = token.split("\\.");
+        assertEquals(3, parts.length, "JWT must have 3 parts");
+
+        String payloadJson =
+                new String(Base64.getUrlDecoder().decode(parts[1]), java.nio.charset.StandardCharsets.UTF_8);
+
+        // Verify roles is now a JSON array
+        assertTrue(payloadJson.contains("\"roles\":["), "roles should be a JSON array");
+        assertTrue(payloadJson.contains("\"groups\":["), "groups should be a JSON array");
+        assertTrue(payloadJson.contains("SUPER_ADMIN"), "Should contain SUPER_ADMIN role");
     }
 
     private User createTestUser() {

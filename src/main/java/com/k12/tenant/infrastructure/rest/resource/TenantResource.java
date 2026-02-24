@@ -7,6 +7,7 @@ import com.k12.tenant.infrastructure.rest.dto.CreateTenantRequest;
 import com.k12.tenant.infrastructure.rest.dto.ErrorResponse;
 import com.k12.tenant.infrastructure.rest.dto.TenantResponse;
 import com.k12.tenant.infrastructure.rest.mapper.ErrorResponseMapper;
+import jakarta.annotation.security.DeclareRoles;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
@@ -26,6 +27,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 @Consumes(MediaType.APPLICATION_JSON)
 @RequiredArgsConstructor
 @Tag(name = "Tenants", description = "Operations for managing tenants")
+@DeclareRoles("SUPER_ADMIN")
 @RolesAllowed("SUPER_ADMIN")
 public class TenantResource {
 

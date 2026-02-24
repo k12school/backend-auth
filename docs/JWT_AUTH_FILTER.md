@@ -7,7 +7,7 @@ A JWT authentication filter has been implemented that captures JWT tokens from H
 ## Components
 
 ### 1. JWTAuthenticationFilter
-**Location:** `com.k12.infrastructure.security.JWTAuthenticationFilter`
+**Location:** `com.k12.common.infrastructure.security.JWTAuthenticationFilter`
 
 A JAX-RS ContainerRequestFilter that:
 - Extracts JWT from `Authorization: Bearer <token>` header
@@ -17,7 +17,7 @@ A JAX-RS ContainerRequestFilter that:
 - Skips authentication if no token is provided (doesn't enforce auth)
 
 ### 2. JWTSecurityContext
-**Location:** `com.k12.infrastructure.security.JWTSecurityContext`
+**Location:** `com.k12.common.infrastructure.security.JWTSecurityContext`
 
 Custom SecurityContext implementation that:
 - Wraps a JWTPrincipal with user information
@@ -25,7 +25,7 @@ Custom SecurityContext implementation that:
 - Returns JWT authentication scheme
 
 ### 3. JWTPrincipal
-**Location:** `com.k12.infrastructure.security.JWTPrincipal`
+**Location:** `com.k12.common.infrastructure.security.JWTPrincipal`
 
 Principal implementation containing:
 - `getUserId()` - User ID from JWT subject
