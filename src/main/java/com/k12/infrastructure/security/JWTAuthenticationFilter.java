@@ -77,6 +77,15 @@ public class JWTAuthenticationFilter implements ContainerRequestFilter {
             // Store claims in request context property for CDI access
             requestContext.setProperty("jwt.claims", claims);
 
+            // Create and store AuthContext for CDI access
+            Set<String> roles = extractRoles(claims);
+            AuthContext authContext = new AuthContext(tenantId, roles);
+
+            // Set additional properties for direct access
+            requestContext.setProperty("tenantId", tenantId);
+            requestContext.setProperty("roles", roles);
+            requestContext.setProperty("auth.context", authContext);
+
             LOGGER.debug("JWT authenticated successfully for user: {}", claims.getSubject());
 
         } catch (Exception e) {
