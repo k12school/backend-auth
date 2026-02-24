@@ -1,5 +1,6 @@
 package com.k12.infrastructure.security;
 
+import com.k12.common.domain.model.TenantId;
 import java.net.URI;
 import java.security.Principal;
 import java.util.Set;
@@ -19,7 +20,7 @@ public class JWTSecurityContext implements jakarta.ws.rs.core.SecurityContext {
     private final JWTPrincipal principal;
     private final URI requestUri;
 
-    public JWTSecurityContext(String userId, String email, Set<String> roles, String tenantId, URI requestUri) {
+    public JWTSecurityContext(String userId, String email, Set<String> roles, TenantId tenantId, URI requestUri) {
         this.principal = new JWTPrincipal(userId, email, roles, tenantId);
         this.requestUri = requestUri;
     }

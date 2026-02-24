@@ -1,5 +1,6 @@
 package com.k12.user.infrastructure.rest.resource;
 
+import com.k12.common.domain.model.TenantId;
 import com.k12.infrastructure.security.JWTPrincipal;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -20,18 +21,19 @@ public class SecurityTestResource {
     public Response whoAmI(@Context SecurityContext securityContext) {
         if (securityContext == null || securityContext.getUserPrincipal() == null) {
             return Response.status(Response.Status.UNAUTHORIZED)
-                .entity("{\"error\":\"UNAUTHORIZED\",\"message\":\"No authentication found\"}")
-                .build();
+                    .entity("{\"error\":\"UNAUTHORIZED\",\"message\":\"No authentication found\"}")
+                    .build();
         }
 
         JWTPrincipal principal = (JWTPrincipal) securityContext.getUserPrincipal();
 
+        TenantId tenantId = principal.getTenantId();
         return Response.ok(new UserInfo(
-            principal.getUserId(),
-            principal.getEmail(),
-            principal.getRoles(),
-            principal.getTenantId()
-        )).build();
+                        principal.getUserId(),
+                        principal.getEmail(),
+                        principal.getRoles(),
+                        tenantId != null ? tenantId.value() : null))
+                .build();
     }
 
     @GET
@@ -41,22 +43,15 @@ public class SecurityTestResource {
         boolean isAdmin = securityContext.isUserInRole("SUPER_ADMIN");
 
         return Response.ok(new AdminCheck(
-            securityContext.getUserPrincipal() != null,
-            isAdmin,
-            securityContext.getUserPrincipal() != null ? securityContext.getUserPrincipal().getName() : null
-        )).build();
+                        securityContext.getUserPrincipal() != null,
+                        isAdmin,
+                        securityContext.getUserPrincipal() != null
+                                ? securityContext.getUserPrincipal().getName()
+                                : null))
+                .build();
     }
 
-    record UserInfo(
-        String userId,
-        String email,
-        java.util.Set<String> roles,
-        String tenantId
-    ) {}
+    record UserInfo(String userId, String email, java.util.Set<String> roles, String tenantId) {}
 
-    record AdminCheck(
-        boolean authenticated,
-        boolean isAdmin,
-        String userId
-    ) {}
+    record AdminCheck(boolean authenticated, boolean isAdmin, String userId) {}
 }

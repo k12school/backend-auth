@@ -1,5 +1,6 @@
 package com.k12.infrastructure.security;
 
+import com.k12.common.domain.model.TenantId;
 import jakarta.annotation.Priority;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
@@ -60,11 +61,14 @@ public class JWTAuthenticationFilter implements ContainerRequestFilter {
             JwtClaims claims = validateAndParseToken(token);
 
             // Create custom security context
+            String tenantIdString = getStringClaimSafely(claims, "tenantId");
+            TenantId tenantId =
+                    (tenantIdString != null && !tenantIdString.isBlank()) ? TenantId.of(tenantIdString) : null;
             JWTSecurityContext securityContext = new JWTSecurityContext(
                     claims.getSubject(),
                     getStringClaimSafely(claims, "email"),
                     extractRoles(claims),
-                    getStringClaimSafely(claims, "tenantId"),
+                    tenantId,
                     requestContext.getUriInfo().getRequestUri());
 
             // Set security context on request

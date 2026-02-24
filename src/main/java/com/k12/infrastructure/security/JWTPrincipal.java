@@ -1,5 +1,6 @@
 package com.k12.infrastructure.security;
 
+import com.k12.common.domain.model.TenantId;
 import java.security.Principal;
 import java.util.Set;
 
@@ -32,9 +33,9 @@ public class JWTPrincipal implements Principal {
     private final String userId;
     private final String email;
     private final Set<String> roles;
-    private final String tenantId;
+    private final TenantId tenantId;
 
-    public JWTPrincipal(String userId, String email, Set<String> roles, String tenantId) {
+    public JWTPrincipal(String userId, String email, Set<String> roles, TenantId tenantId) {
         this.userId = userId;
         this.email = email;
         this.roles = roles != null ? roles : Set.of();
@@ -78,7 +79,7 @@ public class JWTPrincipal implements Principal {
      *
      * @return Tenant ID or null if not present
      */
-    public String getTenantId() {
+    public TenantId getTenantId() {
         return tenantId;
     }
 
@@ -97,7 +98,7 @@ public class JWTPrincipal implements Principal {
         return "JWTPrincipal{" + "userId='"
                 + userId + '\'' + ", email='"
                 + email + '\'' + ", roles="
-                + roles + ", tenantId='"
-                + tenantId + '\'' + '}';
+                + roles + ", tenantId="
+                + tenantId + '}';
     }
 }
