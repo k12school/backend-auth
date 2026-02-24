@@ -1,7 +1,6 @@
 package com.k12.infrastructure.security;
 
 import com.k12.common.domain.model.TenantId;
-import jakarta.enterprise.context.RequestScoped;
 import java.util.Optional;
 import java.util.Set;
 
@@ -23,8 +22,9 @@ import java.util.Set;
  *
  * <p>The context is created per-request and destroyed at the end of the request,
  * ensuring thread-safe isolation between concurrent requests.
+ *
+ * <p>Note: This class is produced via {@link AuthContextProducer} as a request-scoped bean.
  */
-@RequestScoped
 public class AuthContext {
 
     private final Optional<TenantId> tenantId;
