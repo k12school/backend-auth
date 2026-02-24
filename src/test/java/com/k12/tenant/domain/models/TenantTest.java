@@ -105,6 +105,21 @@ class TenantTest {
             assertThat(result.isFailure()).isTrue();
             assertThat(result.getError()).isEqualTo(CANNOT_ACTIVATE_INACTIVE);
         }
+
+        @Test
+        @DisplayName("Should fail when activating deleted tenant")
+        void shouldFailWhenActivatingDeletedTenant() {
+            // Given: A tenant that has been deleted (INACTIVE status after delete event)
+            var tenant = createInactiveTenant();
+            var command = new TenantCommands.ActivateTenant(tenant.id());
+
+            // When
+            var result = tenant.process(command);
+
+            // Then
+            assertThat(result.isFailure()).isTrue();
+            assertThat(result.getError()).isEqualTo(CANNOT_ACTIVATE_INACTIVE);
+        }
     }
 
     @Nested
@@ -126,6 +141,11 @@ class TenantTest {
             assertThat(result.get()).isInstanceOfSatisfying(TenantEvents.TenantDeleted.class, event -> {
                 assertThat(event.tenantId()).isEqualTo(tenant.id());
             });
+
+            // Verify: When the delete event is applied, status becomes INACTIVE
+            var applyResult = tenant.apply(result.get());
+            assertThat(applyResult.isSuccess()).isTrue();
+            assertThat(applyResult.get().status()).isEqualTo(TenantStatus.INACTIVE);
         }
 
         @Test

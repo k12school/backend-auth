@@ -162,10 +162,11 @@ public final class TenantReconstructor {
                 Result.success(
                         new Tenant(tenant.id(), tenant.name(), tenant.subdomain(), TenantStatus.INACTIVE, version));
 
-            // TenantDeleted: Marks tenant as deleted (status remains unchanged), updates version
+            // TenantDeleted: Changes status to INACTIVE (soft delete) and updates version
             case TenantEvents.TenantDeleted(var tenantId, var deletedAt, long version)
             when tenant != null ->
-                Result.success(new Tenant(tenant.id(), tenant.name(), tenant.subdomain(), tenant.status(), version));
+                Result.success(
+                        new Tenant(tenant.id(), tenant.name(), tenant.subdomain(), TenantStatus.INACTIVE, version));
 
             // TenantNameUpdated: Changes name and updates version
             case TenantEvents.TenantNameUpdated(
