@@ -31,7 +31,7 @@ Principal implementation containing:
 - `getUserId()` - User ID from JWT subject
 - `getEmail()` - User email from JWT claim
 - `getRoles()` - Set of user roles
-- `getTenantId()` - Tenant ID for multi-tenancy
+- `getTenantId()` - **TenantId value object** for multi-tenancy (changed from String)
 - `hasRole(String)` - Check if user has specific role
 
 ### 4. SecurityTestResource
@@ -62,7 +62,11 @@ public class MyResource {
         String userId = principal.getUserId();
         String email = principal.getEmail();
         Set<String> roles = principal.getRoles();
-        String tenantId = principal.getTenantId();
+        TenantId tenantId = principal.getTenantId();
+        if (tenantId != null) {
+            String id = tenantId.value();
+            // Use tenant ID
+        }
 
         // Check roles
         if (principal.hasRole("SUPER_ADMIN")) {
@@ -108,6 +112,70 @@ public Response requireAuth(@Context SecurityContext securityContext) {
             .build();
     }
     // Protected logic here
+}
+```
+
+### Access Patterns
+
+The JWT authentication filter provides three patterns for accessing tenant and role information:
+
+#### Pattern 1: CDI Injection (Recommended)
+
+The simplest way to access tenant and role information:
+
+```java
+@Path("/api/resource")
+public class MyResource {
+
+    @Inject
+    private AuthContext authContext;
+
+    @GET
+    public Response getData() {
+        Optional<TenantId> tenantId = authContext.getTenantId();
+        Set<String> roles = authContext.getRoles();
+
+        if (authContext.hasRole("ADMIN")) {
+            // Admin logic
+        }
+
+        return Response.ok().build();
+    }
+}
+```
+
+#### Pattern 2: SecurityContext (Enhanced)
+
+Access via JAX-RS SecurityContext with type-safe TenantId:
+
+```java
+@GET
+public Response getData(@Context SecurityContext securityContext) {
+    JWTPrincipal principal = (JWTPrincipal) securityContext.getUserPrincipal();
+
+    // Now returns TenantId value object instead of String
+    TenantId tenantId = principal.getTenantId();
+    if (tenantId != null) {
+        String id = tenantId.value();
+        // Use tenant ID
+    }
+
+    Set<String> roles = principal.getRoles();
+    return Response.ok().build();
+}
+```
+
+#### Pattern 3: Request Properties
+
+Direct access from ContainerRequestContext:
+
+```java
+@GET
+public Response getData(@Context ContainerRequestContext requestContext) {
+    TenantId tenantId = (TenantId) requestContext.getProperty("tenantId");
+    Set<String> roles = (Set<String>) requestContext.getProperty("roles");
+
+    return Response.ok().build();
 }
 ```
 
