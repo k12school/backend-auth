@@ -64,10 +64,12 @@ public class JWTAuthenticationFilter implements ContainerRequestFilter {
             String tenantIdString = getStringClaimSafely(claims, "tenantId");
             TenantId tenantId =
                     (tenantIdString != null && !tenantIdString.isBlank()) ? TenantId.of(tenantIdString) : null;
+            Set<String> roles = extractRoles(claims);
+
             JWTSecurityContext securityContext = new JWTSecurityContext(
                     claims.getSubject(),
                     getStringClaimSafely(claims, "email"),
-                    extractRoles(claims),
+                    roles,
                     tenantId,
                     requestContext.getUriInfo().getRequestUri());
 
@@ -78,7 +80,6 @@ public class JWTAuthenticationFilter implements ContainerRequestFilter {
             requestContext.setProperty("jwt.claims", claims);
 
             // Create and store AuthContext for CDI access
-            Set<String> roles = extractRoles(claims);
             AuthContext authContext = new AuthContext(tenantId, roles);
 
             // Set additional properties for direct access
