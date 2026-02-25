@@ -32,6 +32,10 @@ dependencies {
     implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
     implementation("io.quarkus:quarkus-opentelemetry")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.45.0")
+    // OpenTelemetry Logs SDK for log export
+    implementation("io.opentelemetry:opentelemetry-sdk-logs:1.45.0")
+    // JBoss Log Manager for custom handler
+    implementation("org.jboss.logmanager:jboss-logmanager:3.2.0.Final")
     implementation("io.quarkus:quarkus-agroal")
     implementation("io.quarkus:quarkus-jdbc-postgresql")
     implementation("io.quarkus:quarkus-flyway")
