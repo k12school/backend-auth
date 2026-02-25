@@ -13,9 +13,7 @@
     ]
   },
   "editable": true,
-  "gnetId": null,
   "graphTooltip": 0,
-  "id": null,
   "links": [],
   "panels": [
     {
@@ -31,16 +29,16 @@
       },
       "id": 1,
       "options": {
-        "collapseTraces": true,
+        "collapseTraces": false,
         "derivative": {
           "calcs": ["rate", "latency"],
           "col": 0,
-          "enabled": true,
+          "enabled": false,
           "fillMode": "previous",
           "unit": "s",
           "unitScale": 1000
         },
-        "diffMode": "diffWith_previous",
+        "diffMode": "diffWithPrevious",
         "enableSearch": true,
         "extralinks": [],
         "filterByTraceID": "",
@@ -104,7 +102,7 @@
       "type": "traces"
     }
   ],
-  "refresh": "5s",
+  "refresh": "",
   "schemaVersion": 27,
   "style": "dark",
   "tags": ["traces", "tempo", "k12"],
@@ -112,7 +110,7 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
