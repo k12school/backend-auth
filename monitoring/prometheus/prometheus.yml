@@ -1,0 +1,101 @@
+# Prometheus Configuration for K12 Backend
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'k12-backend'
+    environment: 'development'
+
+# Alertmanager configuration (optional, for Phase 2)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # ============================================
+  # K12 QUARKUS APPLICATION
+  # ============================================
+  - job_name: 'k12-backend'
+    static_configs:
+      - targets: ['localhost:8080']
+        labels:
+          application: 'k12-backend'
+          environment: 'development'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # ============================================
+  # OPENTELEMETRY COLLECTOR
+  # ============================================
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8889']
+        labels:
+          service: 'otel-collector'
+    scrape_interval: 15s
+
+  # ============================================
+  # POSTGRES EXPORTER - DATABASE METRICS
+  # ============================================
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['localhost:9187']
+        labels:
+          service: 'postgres-exporter'
+          database: 'k12_db'
+    scrape_interval: 15s
+
+  # ============================================
+  # TEMPO - TRACE METRICS
+  # ============================================
+  - job_name: 'tempo'
+    static_configs:
+      - targets: ['localhost:3200']
+        labels:
+          service: 'tempo'
+    scrape_interval: 15s
+
+  # ============================================
+  # PROMETHEUS SELF-SCRAPE
+  # ============================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # ============================================
+  # CADVISOR - CONTAINER METRICS
+  # ============================================
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+
+  # ============================================
+  # NODE EXPORTER - HOST METRICS
+  # ============================================
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+
+  # ============================================
+  # GRAFANA
+  # ============================================
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+    metrics_path: '/metrics'

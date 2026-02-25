@@ -1,0 +1,204 @@
+# Phase 1 Monitoring Stack: Prometheus + Grafana + Loki + OpenTelemetry Collector
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+services:
+  # ============================================
+  # PROMETHEUS - Metrics Collection
+  # ============================================
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: k12-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus-data:/prometheus
+    network_mode: host
+    restart: unless-stopped
+
+  # ============================================
+  # GRAFANA - Dashboards & Visualization
+  # ============================================
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: k12-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
+
+  # ============================================
+  # LOKI - Log Aggregation
+  # ============================================
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: k12-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ============================================
+  # PROMTAIL - Log Collector
+  # ============================================
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: k12-promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - ./log:/var/log/k12:ro
+    ports:
+      - "9080:9080" # Health check
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+
+  # ============================================
+  # OPEN TELEMETRY COLLECTOR
+  # ============================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.119.0
+    container_name: k12-otel-collector
+    command: --config=/etc/otelcol-contrib/config.yaml
+    volumes:
+      - ./monitoring/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Metrics
+      - "8889:8889"   # Logs
+      - "13133:13133" # Health check
+    network_mode: host
+    restart: unless-stopped
+
+  # ============================================
+  # CADVISOR - Container Metrics
+  # ============================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    container_name: k12-cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ============================================
+  # NODE EXPORTER - Host Metrics
+  # ============================================
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: k12-node-exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ============================================
+  # TEMPO - Distributed Tracing
+  # ============================================
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: k12-tempo
+    command: -config.file=/etc/tempo.yaml
+    volumes:
+      - ./monitoring/tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200"   # Tempo UI
+      - "14317:14317" # OTLP gRPC receiver (non-standard port to avoid collector conflict)
+      - "14318:14318" # OTLP HTTP receiver (non-standard port to avoid collector conflict)
+      - "9411:9411"   # Zipkin (legacy)
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ============================================
+  # POSTGRES EXPORTER - Database Metrics
+  # ============================================
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: k12-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://k12_user:k12_password@host.docker.internal:15432/k12_db?sslmode=disable"
+    ports:
+      - "9187:9187"
+    network_mode: host
+    restart: unless-stopped
+
+  # ============================================
+  # UPTIME KUMA - External Monitoring
+  # ============================================
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.15
+    container_name: k12-uptime-kuma
+    volumes:
+      - uptime-kuma-data:/app/data
+    network_mode: host
+    restart: unless-stopped
+
+networks:
+  monitoring:
+    driver: bridge
+    name: k12-monitoring
+
+volumes:
+  prometheus-data:
+    name: k12-prometheus-data
+  grafana-data:
+    name: k12-grafana-data
+  loki-data:
+    name: k12-loki-data
+  tempo-data:
+    name: k12-tempo-data
+  uptime-kuma-data:
+    name: k12-uptime-kuma-data
