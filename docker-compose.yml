@@ -43,7 +43,9 @@ services:
 
       # OpenTelemetry configuration
       QUARKUS_OTEL_ENABLED: "true"
-      QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT: http://k12-signoz-otel-collector:4317
+      # Use HTTP/JSON protocol (port 4318) instead of gRPC (port 4317)
+      QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT: http://k12-signoz-otel-collector:4318
+      QUARKUS_OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       QUARKUS_OTEL_TRACES_SAMPLER: always_on
       QUARKUS_OTEL_RESOURCE_ATTRIBUTES: "service.name=k12-backend,deployment.environment=development"
 
