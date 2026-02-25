@@ -73,7 +73,7 @@
           "limit": 20,
           "queryType": "traceqlSearch",
           "queryTypeVersion": "2",
-          "search": "",
+          "search": "{}",
           "tableType": "traces",
           "timeFieldOverride": ""
         },
