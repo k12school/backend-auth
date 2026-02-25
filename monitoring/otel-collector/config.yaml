@@ -15,7 +15,7 @@ processors:
 exporters:
   # Debug exporter - logs to console for verification
   debug:
-    verbosity: normal
+    verbosity: detailed
 
   # SigNoz OTLP exporter - sends traces and metrics to SigNoz
   otlp/signoz:
