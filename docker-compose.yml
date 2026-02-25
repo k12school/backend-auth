@@ -1,26 +1,79 @@
+version: '3.8'
+
 services:
-  postgres:
+  # ============================================
+  # POSTGRES - Application Database
+  # ============================================
+  k12-postgres:
     image: postgres:17-alpine
-    container_name: k12-postgres-dev
+    container_name: k12-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-k12_db}
-      POSTGRES_USER: ${POSTGRES_USER:-k12_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-k12_password}
-      # Enable pg_stat_statements for query performance monitoring
-      POSTGRES_SHARED_PRELOAD_LIBRARITIES: pg_stat_statements
-    ports:
-      - "${HOST_PORT:-15432}:5432"
+      POSTGRES_USER: k12_user
+      POSTGRES_PASSWORD: k12_password
+      POSTGRES_DB: k12_db
+    volumes:
+      - k12-postgres-data:/var/lib/postgresql/data
+      # Init scripts if needed
+      - ./monitoring/postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - k12-monitoring
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-k12_user}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U k12_user -d k12_db"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+
+  k12-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: k12-backend
+    ports:
+      - "8080:8080"  # HTTP API
+      - "5005:5005"  # Debug
+    environment:
+      # Quarkus configuration
+      QUARKUS_HTTP_HOST: 0.0.0.0
+      QUARKUS_HTTP_PORT: 8080
+      QUARKUS_DATASOURCE_USERNAME: k12_user
+      QUARKUS_DATASOURCE_PASSWORD: k12_password
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://k12-postgres:5432/k12_db
+
+      # OpenTelemetry configuration
+      QUARKUS_OTEL_ENABLED: "true"
+      QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT: http://k12-signoz-otel-collector:4317
+      QUARKUS_OTEL_TRACES_SAMPLER: always_on
+      QUARKUS_OTEL_RESOURCE_ATTRIBUTES: "service.name=k12-backend,deployment.environment=development"
+
+      # JWT configuration
+      JWT_SECRET: k12-default-secret-key-for-jwt-token-signing-min-256-bits
+
+      # Logging configuration for SigNoz
+      QUARKUS_LOG_LEVEL: INFO
+      QUARKUS_LOG_CATEGORY_"com.k12"_LEVEL: INFO
+      QUARKUS_LOG_HANDLER_JSON_ENABLED: "true"
+    networks:
+      - k12-monitoring
+    depends_on:
+      k12-postgres:
+        condition: service_healthy
     restart: unless-stopped
-    # Add volume for persistent data
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./monitoring/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  k12-monitoring:
+    name: k12-monitoring
+    external: true
 
 volumes:
-  postgres-data:
+  k12-backend-data:
+    name: k12-backend-data
+  k12-postgres-data:
     name: k12-postgres-data

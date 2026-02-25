@@ -1,0 +1,47 @@
+# Gradle
+.gradle/
+# Keep quarkus-app for Docker build
+build/
+!build/quarkus-app/
+gradle-app.setting
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Monitoring (we don't need this in the app container)
+monitoring/
+
+# Docker
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Scripts
+*.sh
+
+# Logs
+*.log
+
+# Documentation
+README.md
+docs/
+*.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Test artifacts
+test-results/
+*.test
