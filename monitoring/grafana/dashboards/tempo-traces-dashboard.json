@@ -14,106 +14,205 @@
   },
   "editable": true,
   "graphTooltip": 0,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": ["tempo"],
+      "targetBlank": true,
+      "title": "View Traces in Explore",
+      "tooltip": "Open Tempo Explore",
+      "type": "dashboards",
+      "url": "/explore?schemaVersion=1&panes=%7B%22xi0%22%3A%7B%22datasource%22%3A%22P214B5B846CF3925F%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22P214B5B846CF3925F%22%7D%2C%22queryType%22%3A%22traceqlSearch%22%2C%22query%22%3A%22%7B%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-6h%22%2C%22to%22%3A%22now%22%7D%7D%7D"
+    }
+  ],
   "panels": [
     {
       "datasource": {
-        "type": "tempo",
-        "uid": "P214B5B846CF3925F"
+        "type": "datasource",
+        "uid": "-- Grafana --"
       },
       "gridPos": {
-        "h": 20,
+        "h": 8,
         "w": 24,
         "x": 0,
         "y": 0
       },
       "id": 1,
       "options": {
-        "alignTableColumns": true,
-        "calcs": ["rate", "latency"],
-        "collapseTraces": true,
-        "columns": [
-          "duration",
-          "method",
-          "name",
-          "parentSpanId",
-          "spanId",
-          "timestamp",
-          "traceID"
-        ],
-        "demuxColors": "#fec108",
-        "deduplication": "exact-match",
-        "diffMode": "diffWithPrevious",
-        "displayMode": "default",
-        "enableSearch": true,
-        "extralinks": [],
-        "filterByTraceID": "",
-        "filterFilters": [],
-        "filterMaxDuration": "",
-        "filterMinDuration": "",
-        "flow": {
-          "default": []
-        },
-        "groupBy": [],
-        "headerColor": "#004542",
-        "hideDiffCalcs": true,
-        "hideTotal": false,
-        "ignoreTotal": true,
-        "layout": "kratos-v",
-        "limit": 20,
-        "maxDuration": "",
-        "minDuration": "",
-        "nodeFilter": {
-          "data": [],
-          "type": "exclude"
-        },
-        "query": {
-          "filters": [],
-          "groupBy": [],
-          "limit": 20,
-          "queryType": "traceqlSearch",
-          "queryTypeVersion": "2",
-          "search": "{}",
-          "tableType": "traces",
-          "timeFieldOverride": ""
-        },
-        "recentHits": false,
-        "refresh": false,
-        "rubrics": [],
-        "showCalcHelp": false,
-        "showDiffCalcs": false,
-        "showMinionsForServiceGraph": true,
-        "showRecentSearches": false,
-        "showOperationColumn": true,
-        "showServiceMap": true,
-        "showTraceId": true,
-        "sort": {
-          "col": 0,
-          "desc": true,
-          "type": ["latency"]
-        },
-        "spanBar": {
-          "colorMode": "col",
-          "showCompact": true
-        },
-        "spanNameColumnWidth": 250,
-        "timeRounding": "ms",
-        "tracesTable": {
-          "calcs": ["rate", "latency"]
-        }
+        "content": "# Distributed Traces\n\nTraces are stored in **Tempo** and can be viewed using Grafana's **Explore** feature.\n\n## How to View Traces\n\n1. Click the **View Traces in Explore** link in the top menu\n2. Or go to **Explore** in the left sidebar and select **Tempo** as the datasource\n3. Click **Search** to see all traces\n4. Click on any trace to view spans, timeline, and attributes\n\n## Current Status\n\n- **Service**: k12-backend\n- **Traces**: 20+ traces available\n- **Time Range**: Last 6 hours\n- **Operations**: GET /metrics, POST /api/auth/login\n\n## Trace Details\n\nEach trace includes:\n- HTTP method and route\n- Request duration\n- Span timeline\n- Service attributes\n\n## Alternative: Direct Tempo API\n\nYou can also query traces directly:\n```bash\ncurl -s \"http://localhost:3000/api/datasources/proxy/3/api/search\" \\\n  -u \"admin:admin\" \\\n  -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"query\":\"{}\"}'\n```\n\n---\n\n*Note: The Tempo 2.x web UI has been deprecated. Use Grafana Explore for trace visualization.*",
+        "mode": "markdown"
       },
       "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
-            "type": "tempo",
-            "uid": "P214B5B846CF3925F"
+            "type": "datasource",
+            "uid": "-- Grafana --"
           },
           "refId": "A"
         }
       ],
-      "title": "Distributed Traces",
-      "type": "traces"
+      "title": "How to View Distributed Traces",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "rate(span_calls_total{service_name=\"k12-backend\"}[5m])",
+          "refId": "A"
+        }
+      ],
+      "title": "Trace Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "histogram_quantile(0.95, rate(span_duration_milliseconds{service_name=\"k12-backend\"}[5m])) / 1000",
+          "refId": "A"
+        }
+      ],
+      "title": "95th Percentile Latency",
+      "type": "timeseries"
     }
   ],
   "refresh": "",
@@ -131,5 +230,5 @@
   "timezone": "",
   "title": "K12 Backend - Distributed Traces",
   "uid": "k12-traces",
-  "version": 3
+  "version": 4
 }
