@@ -6,6 +6,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-k12_db}
       POSTGRES_USER: ${POSTGRES_USER:-k12_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-k12_password}
+      # Enable pg_stat_statements for query performance monitoring
+      POSTGRES_SHARED_PRELOAD_LIBRARITIES: pg_stat_statements
     ports:
       - "${HOST_PORT:-15432}:5432"
     healthcheck:
@@ -14,3 +16,11 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    # Add volume for persistent data
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./monitoring/postgres-init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  postgres-data:
+    name: k12-postgres-data
