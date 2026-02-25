@@ -7,6 +7,7 @@ import com.k12.user.domain.error.AuthenticationError;
 import com.k12.user.domain.models.User;
 import com.k12.user.domain.service.AuthenticationService;
 import com.k12.user.infrastructure.security.TokenService;
+import io.micrometer.core.annotation.Timed;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.RequiredArgsConstructor;
 
@@ -15,6 +16,10 @@ import lombok.RequiredArgsConstructor;
 public class AuthenticationApplicationService {
     private final AuthenticationService authenticationService;
 
+    @Timed(
+            value = "auth.login",
+            percentiles = {0.5, 0.95, 0.99},
+            description = "Time to authenticate user")
     public Result<LoginResponse, AuthenticationError> login(LoginRequest request) {
         return authenticationService
                 .authenticate(request.email(), request.password())

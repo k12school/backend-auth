@@ -9,6 +9,7 @@ import com.k12.tenant.domain.models.Subdomain;
 import com.k12.tenant.domain.models.TenantName;
 import com.k12.tenant.domain.models.TenantStatus;
 import com.k12.tenant.domain.models.events.TenantEvents;
+import io.micrometer.core.annotation.Timed;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.util.UUID;
@@ -27,6 +28,10 @@ public final class KryoEventSerializer {
      * @param event the event to serialize
      * @return serialized byte array
      */
+    @Timed(
+            value = "serialization.kryo.serialize",
+            percentiles = {0.5, 0.95, 0.99},
+            description = "Time to serialize event with Kryo")
     public static byte[] serialize(TenantEvents event) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 Output output = new Output(baos)) {
@@ -44,6 +49,10 @@ public final class KryoEventSerializer {
      * @param data the byte array to deserialize
      * @return deserialized event
      */
+    @Timed(
+            value = "serialization.kryo.deserialize",
+            percentiles = {0.5, 0.95, 0.99},
+            description = "Time to deserialize event with Kryo")
     public static TenantEvents deserialize(byte[] data) {
         if (data == null || data.length == 0) {
             throw new IllegalArgumentException("Cannot deserialize null or empty data");

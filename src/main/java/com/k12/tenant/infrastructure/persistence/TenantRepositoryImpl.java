@@ -14,6 +14,10 @@ import com.k12.tenant.domain.models.error.TenantError;
 import com.k12.tenant.domain.models.events.TenantEvents;
 import com.k12.tenant.domain.port.TenantRepository;
 import io.agroal.api.AgroalDataSource;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -44,8 +48,13 @@ import org.jooq.impl.DSL;
 public class TenantRepositoryImpl implements TenantRepository {
 
     private final AgroalDataSource dataSource;
+    private final MeterRegistry meterRegistry;
 
     @Override
+    @Timed(
+            value = "db.tenant.append",
+            percentiles = {0.5, 0.95, 0.99},
+            description = "Time to append event to database")
     @Transactional
     public Result<Void, TenantError> append(TenantEvents event, long expectedVersion) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
@@ -73,6 +82,7 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             // If 0 rows inserted, version already exists => conflict
             if (inserted == 0) {
+                recordError("VERSION_CONFLICT");
                 return Result.failure(VERSION_CONFLICT);
             }
 
@@ -82,13 +92,19 @@ public class TenantRepositoryImpl implements TenantRepository {
             return Result.success(null);
         } catch (IntegrityConstraintViolationException e) {
             // Catch any other constraint violations
+            recordError("STORAGE_ERROR_CONSTRAINT");
             return Result.failure(STORAGE_ERROR);
         } catch (Exception e) {
+            recordError("STORAGE_ERROR_EXCEPTION");
             return Result.failure(STORAGE_ERROR);
         }
     }
 
     @Override
+    @Timed(
+            value = "db.tenant.loadEvents",
+            percentiles = {0.5, 0.95, 0.99},
+            description = "Time to load events from database")
     public Result<List<TenantEvents>, TenantError> loadEvents(TenantId tenantId) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
@@ -104,13 +120,22 @@ public class TenantRepositoryImpl implements TenantRepository {
                 events.add(KryoEventSerializer.deserialize(eventData));
             }
 
+            // Record event count for this tenant
+            int eventCount = events.size();
+            recordEventCount(tenantId.value(), eventCount);
+
             return Result.success(events);
         } catch (Exception e) {
+            recordError("LOAD_EVENTS_ERROR");
             return Result.failure(STORAGE_ERROR);
         }
     }
 
     @Override
+    @Timed(
+            value = "db.tenant.load",
+            percentiles = {0.5, 0.95, 0.99},
+            description = "Time to load and reconstruct tenant")
     public Result<Tenant, TenantError> load(TenantId tenantId) {
         var eventsResult = loadEvents(tenantId);
         if (eventsResult.isFailure()) {
@@ -136,11 +161,16 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             return Result.success(version);
         } catch (Exception e) {
+            recordError("GET_VERSION_ERROR");
             return Result.failure(STORAGE_ERROR);
         }
     }
 
     @Override
+    @Timed(
+            value = "db.tenant.nameExists",
+            percentiles = {0.5, 0.95, 0.99},
+            description = "Time to check if tenant name exists")
     public Result<Boolean, TenantError> nameExists(String name) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
@@ -149,11 +179,16 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             return Result.success(exists);
         } catch (Exception e) {
+            recordError("NAME_EXISTS_ERROR");
             return Result.failure(STORAGE_ERROR);
         }
     }
 
     @Override
+    @Timed(
+            value = "db.tenant.subdomainExists",
+            percentiles = {0.5, 0.95, 0.99},
+            description = "Time to check if subdomain exists")
     public Result<Boolean, TenantError> subdomainExists(String subdomain) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
@@ -162,6 +197,7 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             return Result.success(exists);
         } catch (Exception e) {
+            recordError("SUBDOMAIN_EXISTS_ERROR");
             return Result.failure(STORAGE_ERROR);
         }
     }
@@ -178,6 +214,7 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             return id != null ? Optional.of(new TenantId(id.toString())) : Optional.empty();
         } catch (Exception e) {
+            recordError("FIND_BY_NAME_ERROR");
             return Optional.empty();
         }
     }
@@ -194,8 +231,32 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             return id != null ? Optional.of(new TenantId(id.toString())) : Optional.empty();
         } catch (Exception e) {
+            recordError("FIND_BY_SUBDOMAIN_ERROR");
             return Optional.empty();
         }
+    }
+
+    /**
+     * Record error for metrics tracking.
+     */
+    private void recordError(String errorType) {
+        Counter.builder("tenant.repository.errors")
+                .description("Repository errors by type")
+                .tag("error_type", errorType)
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /**
+     * Record event count for a tenant.
+     */
+    private void recordEventCount(String tenantId, int count) {
+        // Use AtomicInteger to allow Gauge to track changes
+        Gauge.builder("tenant.events.count", () -> count)
+                .description("Number of events for tenant")
+                .tags("tenant_id", tenantId)
+                .strongReference(true)
+                .register(meterRegistry);
     }
 
     /**
