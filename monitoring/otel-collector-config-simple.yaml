@@ -1,0 +1,53 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  filelog/k12-backend:
+    include:
+      - /host/containers/*/userdata/ctr.log
+    exclude:
+      - /host/containers/k12-*/*/userdata/ctr.log
+    start_at: end
+    include_file_name: false
+    include_file_path: true
+processors:
+  batch:
+    send_batch_size: 100
+    send_batch_max_size: 200
+    timeout: 5s
+  resource:
+    attributes:
+      - key: service.name
+        value: k12-backend
+        action: upsert
+      - key: deployment.environment
+        value: development
+        action: upsert
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+exporters:
+  clickhouselogsexporter:
+    dsn: tcp://k12-clickhouse:9000/signoz_logs
+    timeout: 10s
+    use_new_schema: true
+  metadataexporter:
+    cache:
+      provider: in_memory
+    dsn: tcp://k12-clickhouse:9000/signoz_metadata
+    enabled: true
+    timeout: 45s
+service:
+  telemetry:
+    logs:
+      encoding: json
+  extensions:
+    - health_check
+  pipelines:
+    logs:
+      receivers: [filelog/k12-backend, otlp]
+      processors: [batch, resource]
+      exporters: [clickhouselogsexporter, metadataexporter]

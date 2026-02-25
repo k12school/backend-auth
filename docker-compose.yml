@@ -56,8 +56,25 @@ services:
       QUARKUS_LOG_LEVEL: INFO
       QUARKUS_LOG_CATEGORY_"com.k12"_LEVEL: INFO
       QUARKUS_LOG_HANDLER_JSON_ENABLED: "true"
+
+      # OTLP debug logging to diagnose export failures
+      QUARKUS_LOG_CATEGORY_"io.opentelemetry".level: TRACE
+      QUARKUS_LOG_CATEGORY_"io.quarkus.opentelemetry".level: TRACE
+      QUARKUS_LOG_CATEGORY_"io.vertx".level: TRACE
+
+      # Enable file logging for log collection
+      QUARKUS_LOG_FILE_ENABLED: "true"
+      QUARKUS_LOG_FILE_PATH: /app/log/k12-backend.log
+      QUARKUS_LOG_FILE_LEVEL: INFO
+      QUARKUS_LOG_FILE_FORMAT: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - k12-monitoring
+      - k12-signoz-net
     depends_on:
       k12-postgres:
         condition: service_healthy
@@ -72,6 +89,9 @@ services:
 networks:
   k12-monitoring:
     name: k12-monitoring
+    external: true
+  k12-signoz-net:
+    name: k12-signoz-net
     external: true
 
 volumes:
