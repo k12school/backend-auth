@@ -68,6 +68,12 @@ public class OpenTelemetryLogHandler extends Handler {
                 message = message + "\n" + record.getThrown().toString();
             }
 
+            // Debug: print every 100th log to show handler is working
+            if (record.getSequenceNumber() % 100 == 0) {
+                System.out.println("[OpenTelemetryLogHandler] Exporting log #" + record.getSequenceNumber() + ": "
+                        + record.getLevel() + " - " + message);
+            }
+
             // Emit log record
             otelLogger
                     .logRecordBuilder()
@@ -78,6 +84,7 @@ public class OpenTelemetryLogHandler extends Handler {
         } catch (Exception e) {
             // Don't let logging errors break the application
             System.err.println("Failed to export log to OpenTelemetry: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
