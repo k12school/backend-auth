@@ -16,6 +16,9 @@ import com.k12.tenant.domain.models.events.TenantEvents;
 import com.k12.tenant.domain.port.TenantRepository;
 import com.k12.tenant.infrastructure.rest.dto.CreateTenantRequest;
 import io.micrometer.core.annotation.Timed;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.RequiredArgsConstructor;
 
@@ -28,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class TenantService {
 
     private final TenantRepository tenantRepository;
+    private final Tracer tracer;
 
     /**
      * Creates a new tenant.
@@ -40,38 +44,53 @@ public class TenantService {
             percentiles = {0.5, 0.95, 0.99},
             description = "Time to create a new tenant")
     public Result<TenantEvents, TenantError> createTenant(CreateTenantRequest request) {
-        // Check for name conflicts
-        var nameExistsResult = tenantRepository.nameExists(request.name());
-        if (nameExistsResult.isFailure()) {
-            return Result.failure(nameExistsResult.getError());
-        }
-        if (nameExistsResult.get()) {
-            return Result.failure(NAME_ALREADY_EXISTS);
-        }
+        Span span = tracer.spanBuilder("TenantService.createTenant")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
 
-        // Check for subdomain conflicts
-        var subdomainExistsResult = tenantRepository.subdomainExists(request.subdomain());
-        if (subdomainExistsResult.isFailure()) {
-            return Result.failure(subdomainExistsResult.getError());
-        }
-        if (subdomainExistsResult.get()) {
-            return Result.failure(SUBDOMAIN_ALREADY_EXISTS);
-        }
+        try (var scope = span.makeCurrent()) {
+            // Check for name conflicts
+            var nameExistsResult = tenantRepository.nameExists(request.name());
+            if (nameExistsResult.isFailure()) {
+                return Result.failure(nameExistsResult.getError());
+            }
+            if (nameExistsResult.get()) {
+                return Result.failure(NAME_ALREADY_EXISTS);
+            }
 
-        // Create tenant via factory
-        var command = new TenantCommands.CreateTenant(request.name(), request.subdomain());
-        var eventResult = TenantFactory.handle(command);
-        if (eventResult.isFailure()) {
+            // Check for subdomain conflicts
+            var subdomainExistsResult = tenantRepository.subdomainExists(request.subdomain());
+            if (subdomainExistsResult.isFailure()) {
+                return Result.failure(subdomainExistsResult.getError());
+            }
+            if (subdomainExistsResult.get()) {
+                return Result.failure(SUBDOMAIN_ALREADY_EXISTS);
+            }
+
+            // Create tenant via factory
+            var command = new TenantCommands.CreateTenant(request.name(), request.subdomain());
+            var eventResult = TenantFactory.handle(command);
+            if (eventResult.isFailure()) {
+                return eventResult;
+            }
+
+            // Append event to event store (first event has version 1)
+            var appendResult = tenantRepository.append(eventResult.get(), 1L);
+            if (appendResult.isFailure()) {
+                span.recordException(new RuntimeException("Append failed: " + appendResult.getError()));
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, "Append failed");
+                return Result.failure(appendResult.getError());
+            }
+
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
             return eventResult;
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
         }
-
-        // Append event to event store (first event has version 1)
-        var appendResult = tenantRepository.append(eventResult.get(), 1L);
-        if (appendResult.isFailure()) {
-            return Result.failure(appendResult.getError());
-        }
-
-        return eventResult;
     }
 
     /**
@@ -85,7 +104,29 @@ public class TenantService {
             percentiles = {0.5, 0.95, 0.99},
             description = "Time to load a tenant")
     public Result<Tenant, TenantError> getTenant(TenantId tenantId) {
-        return tenantRepository.load(tenantId);
+        Span span = tracer.spanBuilder("TenantService.getTenant")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
+
+        try (var scope = span.makeCurrent()) {
+            var result = tenantRepository.load(tenantId);
+
+            if (result.isFailure()) {
+                span.setStatus(
+                        io.opentelemetry.api.trace.StatusCode.ERROR,
+                        result.getError().toString());
+            } else {
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+            }
+
+            return result;
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     /**

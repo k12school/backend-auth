@@ -7,6 +7,9 @@ import com.k12.tenant.infrastructure.rest.dto.CreateTenantRequest;
 import com.k12.tenant.infrastructure.rest.dto.ErrorResponse;
 import com.k12.tenant.infrastructure.rest.dto.TenantResponse;
 import com.k12.tenant.infrastructure.rest.mapper.ErrorResponseMapper;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
 import jakarta.annotation.security.DeclareRoles;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
@@ -32,6 +35,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 public class TenantResource {
 
     private final TenantService tenantService;
+    private final Tracer tracer;
 
     @POST
     @Operation(
@@ -55,8 +59,29 @@ public class TenantResource {
     public Response createTenant(
             @Parameter(description = "Tenant creation request", required = true) @Valid CreateTenantRequest request) {
 
-        var result = tenantService.createTenant(request);
-        return result.fold(this::created, ErrorResponseMapper::toResponse);
+        Span span = tracer.spanBuilder("TenantResource.createTenant")
+                .setSpanKind(SpanKind.SERVER)
+                .startSpan();
+
+        try (var scope = span.makeCurrent()) {
+            var result = tenantService.createTenant(request);
+
+            return result.fold(
+                    success -> {
+                        Response response = Response.status(Response.Status.CREATED.getStatusCode())
+                                .entity(toDTO(success))
+                                .build();
+                        span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                        return response;
+                    },
+                    ErrorResponseMapper::toResponse);
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     @GET
@@ -78,10 +103,26 @@ public class TenantResource {
                     @PathParam("id")
                     String id) {
 
-        TenantId tenantId = new TenantId(id);
-        var result = tenantService.getTenant(tenantId);
-        return result.fold(
-                success -> Response.ok().entity(TenantResponse.from(success)).build(), ErrorResponseMapper::toResponse);
+        // Start span early to capture framework overhead
+        Span span = tracer.spanBuilder("TenantResource.getTenant")
+                .setSpanKind(SpanKind.SERVER)
+                .startSpan();
+
+        try (var scope = span.makeCurrent()) {
+            TenantId tenantId = new TenantId(id);
+            var result = tenantService.getTenant(tenantId);
+
+            return result.fold(
+                    success ->
+                            Response.ok().entity(TenantResponse.from(success)).build(),
+                    ErrorResponseMapper::toResponse);
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     @POST
@@ -109,9 +150,30 @@ public class TenantResource {
                     @PathParam("id")
                     String id) {
 
-        TenantId tenantId = new TenantId(id);
-        var result = tenantService.activateTenant(tenantId);
-        return result.fold(success -> Response.ok().entity(toDTO(success)).build(), ErrorResponseMapper::toResponse);
+        Span span = tracer.spanBuilder("TenantResource.activateTenant")
+                .setSpanKind(SpanKind.SERVER)
+                .startSpan();
+
+        try (var scope = span.makeCurrent()) {
+            TenantId tenantId = new TenantId(id);
+            var result = tenantService.activateTenant(tenantId);
+
+            return result.fold(
+                    success -> {
+                        span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                        return Response.ok().entity(toDTO(success)).build();
+                    },
+                    error -> {
+                        span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, error.toString());
+                        return ErrorResponseMapper.toResponse(error);
+                    });
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     @PUT
@@ -139,9 +201,30 @@ public class TenantResource {
                     @PathParam("id")
                     String id) {
 
-        TenantId tenantId = new TenantId(id);
-        var result = tenantService.suspendTenant(tenantId);
-        return result.fold(this::ok, ErrorResponseMapper::toResponse);
+        Span span = tracer.spanBuilder("TenantResource.suspendTenant")
+                .setSpanKind(SpanKind.SERVER)
+                .startSpan();
+
+        try (var scope = span.makeCurrent()) {
+            TenantId tenantId = new TenantId(id);
+            var result = tenantService.suspendTenant(tenantId);
+
+            return result.fold(
+                    success -> {
+                        span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                        return Response.ok().entity(toDTO(success)).build();
+                    },
+                    error -> {
+                        span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, error.toString());
+                        return ErrorResponseMapper.toResponse(error);
+                    });
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     @DELETE

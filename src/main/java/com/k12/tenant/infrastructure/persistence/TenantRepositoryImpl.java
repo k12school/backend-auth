@@ -18,6 +18,9 @@ import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -49,6 +52,7 @@ public class TenantRepositoryImpl implements TenantRepository {
 
     private final AgroalDataSource dataSource;
     private final MeterRegistry meterRegistry;
+    private final Tracer tracer;
 
     @Override
     @Timed(
@@ -57,46 +61,60 @@ public class TenantRepositoryImpl implements TenantRepository {
             description = "Time to append event to database")
     @Transactional
     public Result<Void, TenantError> append(TenantEvents event, long expectedVersion) {
-        DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        Span span = tracer.spanBuilder("TenantRepository.append")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
 
-        try {
-            // Insert event with conflict detection
-            // The unique constraint (tenant_id, version) ensures optimistic locking
-            OffsetDateTime occurredAt = OffsetDateTime.ofInstant(extractOccurredAt(event), ZoneOffset.UTC);
-            int inserted = ctx.insertInto(
-                            TENANT_EVENTS,
-                            TENANT_EVENTS.TENANT_ID,
-                            TENANT_EVENTS.EVENT_TYPE,
-                            TENANT_EVENTS.EVENT_DATA,
-                            TENANT_EVENTS.VERSION,
-                            TENANT_EVENTS.OCCURRED_AT)
-                    .values(
-                            extractTenantIdUUID(event),
-                            event.getClass().getSimpleName(),
-                            KryoEventSerializer.serialize(event),
-                            expectedVersion,
-                            occurredAt)
-                    .onConflict(TENANT_EVENTS.TENANT_ID, TENANT_EVENTS.VERSION)
-                    .doNothing()
-                    .execute();
+        try (var scope = span.makeCurrent()) {
+            DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
-            // If 0 rows inserted, version already exists => conflict
-            if (inserted == 0) {
-                recordError("VERSION_CONFLICT");
-                return Result.failure(VERSION_CONFLICT);
+            try {
+                // Insert event with conflict detection
+                // The unique constraint (tenant_id, version) ensures optimistic locking
+                OffsetDateTime occurredAt = OffsetDateTime.ofInstant(extractOccurredAt(event), ZoneOffset.UTC);
+                int inserted = ctx.insertInto(
+                                TENANT_EVENTS,
+                                TENANT_EVENTS.TENANT_ID,
+                                TENANT_EVENTS.EVENT_TYPE,
+                                TENANT_EVENTS.EVENT_DATA,
+                                TENANT_EVENTS.VERSION,
+                                TENANT_EVENTS.OCCURRED_AT)
+                        .values(
+                                extractTenantIdUUID(event),
+                                event.getClass().getSimpleName(),
+                                KryoEventSerializer.serialize(event),
+                                expectedVersion,
+                                occurredAt)
+                        .onConflict(TENANT_EVENTS.TENANT_ID, TENANT_EVENTS.VERSION)
+                        .doNothing()
+                        .execute();
+
+                // If 0 rows inserted, version already exists => conflict
+                if (inserted == 0) {
+                    recordError("VERSION_CONFLICT");
+                    span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, "VERSION_CONFLICT");
+                    return Result.failure(VERSION_CONFLICT);
+                }
+
+                // Update projection in the same transaction
+                updateProjection(ctx, event);
+
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                return Result.success(null);
+            } catch (IntegrityConstraintViolationException e) {
+                // Catch any other constraint violations
+                recordError("STORAGE_ERROR_CONSTRAINT");
+                span.recordException(e);
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+                return Result.failure(STORAGE_ERROR);
+            } catch (Exception e) {
+                recordError("STORAGE_ERROR_EXCEPTION");
+                span.recordException(e);
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+                return Result.failure(STORAGE_ERROR);
             }
-
-            // Update projection in the same transaction
-            updateProjection(ctx, event);
-
-            return Result.success(null);
-        } catch (IntegrityConstraintViolationException e) {
-            // Catch any other constraint violations
-            recordError("STORAGE_ERROR_CONSTRAINT");
-            return Result.failure(STORAGE_ERROR);
-        } catch (Exception e) {
-            recordError("STORAGE_ERROR_EXCEPTION");
-            return Result.failure(STORAGE_ERROR);
+        } finally {
+            span.end();
         }
     }
 
@@ -106,28 +124,66 @@ public class TenantRepositoryImpl implements TenantRepository {
             percentiles = {0.5, 0.95, 0.99},
             description = "Time to load events from database")
     public Result<List<TenantEvents>, TenantError> loadEvents(TenantId tenantId) {
-        DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        Span span = tracer.spanBuilder("TenantRepository.loadEvents")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
 
-        try {
-            List<TenantEventsRecord> records = ctx.selectFrom(TENANT_EVENTS)
-                    .where(TENANT_EVENTS.TENANT_ID.eq(UUID.fromString(tenantId.value())))
-                    .orderBy(TENANT_EVENTS.VERSION.asc())
-                    .fetch();
-
-            List<TenantEvents> events = new ArrayList<>();
-            for (TenantEventsRecord record : records) {
-                byte[] eventData = record.getEventData();
-                events.add(KryoEventSerializer.deserialize(eventData));
+        try (var scope = span.makeCurrent()) {
+            // Capture connection acquisition
+            Span connSpan = tracer.spanBuilder("TenantRepository.getConnection")
+                    .setSpanKind(SpanKind.INTERNAL)
+                    .startSpan();
+            DSLContext ctx;
+            try {
+                ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+                connSpan.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+            } catch (Exception e) {
+                connSpan.recordException(e);
+                connSpan.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, "Connection failed");
+                connSpan.end();
+                throw e;
+            } finally {
+                connSpan.end();
             }
 
-            // Record event count for this tenant
-            int eventCount = events.size();
-            recordEventCount(tenantId.value(), eventCount);
+            // Capture query execution
+            Span querySpan = tracer.spanBuilder("TenantRepository.executeFetch")
+                    .setSpanKind(SpanKind.INTERNAL)
+                    .startSpan();
+            try {
+                List<TenantEventsRecord> records = ctx.selectFrom(TENANT_EVENTS)
+                        .where(TENANT_EVENTS.TENANT_ID.eq(UUID.fromString(tenantId.value())))
+                        .orderBy(TENANT_EVENTS.VERSION.asc())
+                        .fetch();
 
-            return Result.success(events);
+                List<TenantEvents> events = new ArrayList<>();
+                for (TenantEventsRecord record : records) {
+                    byte[] eventData = record.getEventData();
+                    events.add(KryoEventSerializer.deserialize(eventData));
+                }
+
+                // Record event count for this tenant
+                int eventCount = events.size();
+                recordEventCount(tenantId.value(), eventCount);
+
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                querySpan.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                return Result.success(events);
+            } catch (Exception e) {
+                recordError("LOAD_EVENTS_ERROR");
+                querySpan.recordException(e);
+                querySpan.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+                return Result.failure(STORAGE_ERROR);
+            } finally {
+                querySpan.end();
+            }
         } catch (Exception e) {
             recordError("LOAD_EVENTS_ERROR");
+            span.recordException(e);
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
             return Result.failure(STORAGE_ERROR);
+        } finally {
+            span.end();
         }
     }
 
@@ -172,15 +228,25 @@ public class TenantRepositoryImpl implements TenantRepository {
             percentiles = {0.5, 0.95, 0.99},
             description = "Time to check if tenant name exists")
     public Result<Boolean, TenantError> nameExists(String name) {
-        DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        Span span = tracer.spanBuilder("TenantRepository.nameExists")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
 
-        try {
-            boolean exists = ctx.fetchExists(ctx.selectOne().from(TENANTS).where(TENANTS.NAME.eq(name)));
+        try (var scope = span.makeCurrent()) {
+            DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
-            return Result.success(exists);
-        } catch (Exception e) {
-            recordError("NAME_EXISTS_ERROR");
-            return Result.failure(STORAGE_ERROR);
+            try {
+                boolean exists = ctx.fetchExists(ctx.selectOne().from(TENANTS).where(TENANTS.NAME.eq(name)));
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                return Result.success(exists);
+            } catch (Exception e) {
+                recordError("NAME_EXISTS_ERROR");
+                span.recordException(e);
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+                return Result.failure(STORAGE_ERROR);
+            }
+        } finally {
+            span.end();
         }
     }
 
@@ -190,15 +256,25 @@ public class TenantRepositoryImpl implements TenantRepository {
             percentiles = {0.5, 0.95, 0.99},
             description = "Time to check if subdomain exists")
     public Result<Boolean, TenantError> subdomainExists(String subdomain) {
-        DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        Span span = tracer.spanBuilder("TenantRepository.subdomainExists")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
 
-        try {
-            boolean exists = ctx.fetchExists(ctx.selectOne().from(TENANTS).where(TENANTS.SUBDOMAIN.eq(subdomain)));
+        try (var scope = span.makeCurrent()) {
+            DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
-            return Result.success(exists);
-        } catch (Exception e) {
-            recordError("SUBDOMAIN_EXISTS_ERROR");
-            return Result.failure(STORAGE_ERROR);
+            try {
+                boolean exists = ctx.fetchExists(ctx.selectOne().from(TENANTS).where(TENANTS.SUBDOMAIN.eq(subdomain)));
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                return Result.success(exists);
+            } catch (Exception e) {
+                recordError("SUBDOMAIN_EXISTS_ERROR");
+                span.recordException(e);
+                span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+                return Result.failure(STORAGE_ERROR);
+            }
+        } finally {
+            span.end();
         }
     }
 
