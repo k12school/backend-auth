@@ -1,126 +1,65 @@
-# Phase 1 Monitoring Stack: Prometheus + Grafana + Loki + OpenTelemetry Collector
+# Monitoring Stack: SigNoz + Compatible Components
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#
+# NOTE: SigNoz currently provides UI and backend, but requires additional components
+# for full trace/metric/log ingestion. See monitoring/SIGNOZ_TRACES_TEST_REPORT.md for details.
 
 services:
   # ============================================
-  # PROMETHEUS - Metrics Collection
+  # CLICKHOUSE - SigNoz Database Backend
   # ============================================
-  prometheus:
-    image: prom/prometheus:v2.55.1
-    container_name: k12-prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--web.enable-lifecycle'
-    volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
-      - prometheus-data:/prometheus
-    network_mode: host
-    restart: unless-stopped
-
-  # ============================================
-  # GRAFANA - Dashboards & Visualization
-  # ============================================
-  grafana:
-    image: grafana/grafana:11.4.0
-    container_name: k12-grafana
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: k12-clickhouse
+    ports:
+      - "8123:8123"  # HTTP interface
+      - "9000:9000"  # Native interface
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel
-      GF_SERVER_ROOT_URL: http://localhost:3000
-      GF_ANALYTICS_REPORTING_ENABLED: "false"
-      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
-      GF_USERS_ALLOW_SIGN_UP: "false"
+      CLICKHOUSE_DB: signoz
+      CLICKHOUSE_USER: root
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana-data:/var/lib/grafana
-    network_mode: host
+      - clickhouse-data:/var/lib/clickhouse
+    networks:
+      - monitoring
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # SIGNOZ - Observability Platform (UI + Backend)
+  # ============================================
+  signoz:
+    image: signoz/signoz:latest  # Enterprise Edition
+    container_name: k12-signoz
     depends_on:
-      - prometheus
-      - loki
-
-  # ============================================
-  # LOKI - Log Aggregation
-  # ============================================
-  loki:
-    image: grafana/loki:3.0.0
-    container_name: k12-loki
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml:ro
-      - loki-data:/loki
+      clickhouse:
+        condition: service_healthy
     ports:
-      - "3100:3100"
-    restart: unless-stopped
+      - "3301:8080"  # SigNoz frontend UI (external 3301 -> internal 8080)
+    environment:
+      - CLICKHOUSE_DATABASE=signoz
+      - CLICKHOUSE_USER=root
+      - CLICKHOUSE_PASSWORD=password
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+      - SIGNOZ_TELEMETRY_ENABLED=false
+      - SIGNOZ_VERSION_CHECK_ENABLED=false
+      - SIGNOZ_TELEMETRYSTORE_PROVIDER=clickhouse
+      - SIGNOZ_TOKENIZER_JWT_SECRET=change-this-to-a-strong-random-secret-key-min-32-chars
+      - QUERY_CACHE_PATH=/var/lib/signoz/cache
+    volumes:
+      - signoz-data:/var/lib/signoz
     networks:
       - monitoring
-
-  # ============================================
-  # PROMTAIL - Log Collector
-  # ============================================
-  promtail:
-    image: grafana/promtail:3.0.0
-    container_name: k12-promtail
-    command: -config.file=/etc/promtail/config.yml
-    volumes:
-      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
-      - ./log:/var/log/k12:ro
-    ports:
-      - "9080:9080" # Health check
-    restart: unless-stopped
-    networks:
-      - monitoring
-    depends_on:
-      - loki
-
-  # ============================================
-  # OPEN TELEMETRY COLLECTOR
-  # ============================================
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.119.0
-    container_name: k12-otel-collector
-    command: --config=/etc/otelcol-contrib/config.yaml
-    volumes:
-      - ./monitoring/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
-    ports:
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver
-      - "8888:8888"   # Metrics
-      - "8889:8889"   # Logs
-      - "13133:13133" # Health check
-    network_mode: host
     restart: unless-stopped
 
   # ============================================
-  # CADVISOR - Container Metrics
-  # ============================================
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.51.0
-    container_name: k12-cadvisor
-    privileged: true
-    devices:
-      - /dev/kmsg:/dev/kmsg
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    ports:
-      - "8081:8080"
-    restart: unless-stopped
-    networks:
-      - monitoring
-
-  # ============================================
-  # NODE EXPORTER - Host Metrics
+  # NODE EXPORTER - Host Metrics (Compatible)
   # ============================================
   node-exporter:
     image: prom/node-exporter:v1.8.2
@@ -141,26 +80,28 @@ services:
       - monitoring
 
   # ============================================
-  # TEMPO - Distributed Tracing
+  # CADVISOR - Container Metrics (Compatible)
   # ============================================
-  tempo:
-    image: grafana/tempo:2.6.1
-    container_name: k12-tempo
-    command: -config.file=/etc/tempo.yaml
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    container_name: k12-cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
     volumes:
-      - ./monitoring/tempo/tempo.yaml:/etc/tempo.yaml:ro
-      - tempo-data:/tmp/tempo
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
     ports:
-      - "3200:3200"   # Tempo UI
-      - "14317:14317" # OTLP gRPC receiver (non-standard port to avoid collector conflict)
-      - "14318:14318" # OTLP HTTP receiver (non-standard port to avoid collector conflict)
-      - "9411:9411"   # Zipkin (legacy)
+      - "8081:8080"
     restart: unless-stopped
     networks:
       - monitoring
 
   # ============================================
-  # POSTGRES EXPORTER - Database Metrics
+  # POSTGRES EXPORTER - Database Metrics (Compatible)
   # ============================================
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.15.0
@@ -173,7 +114,7 @@ services:
     restart: unless-stopped
 
   # ============================================
-  # UPTIME KUMA - External Monitoring
+  # UPTIME KUMA - External Monitoring (Independent)
   # ============================================
   uptime-kuma:
     image: louislam/uptime-kuma:1.23.15
@@ -189,13 +130,78 @@ networks:
     name: k12-monitoring
 
 volumes:
-  prometheus-data:
-    name: k12-prometheus-data
-  grafana-data:
-    name: k12-grafana-data
-  loki-data:
-    name: k12-loki-data
-  tempo-data:
-    name: k12-tempo-data
+  clickhouse-data:
+    name: k12-clickhouse-data
+  signoz-data:
+    name: k12-signoz-data
   uptime-kuma-data:
     name: k12-uptime-kuma-data
+
+# =============================================================================
+# REMOVED SERVICES (conflicted with SigNoz):
+# =============================================================================
+#
+# REMOVED: prometheus
+#   Reason: SigNoz provides metrics storage and querying
+#   Action: Stopped, volume preserved (k12-prometheus-data)
+#
+# REMOVED: grafana
+#   Reason: SigNoz provides built-in dashboards and visualization
+#   Action: Stopped, volume preserved (k12-grafana-data)
+#
+# REMOVED: loki
+#   Reason: SigNoz provides log aggregation and querying
+#   Action: Stopped, volume preserved (k12-loki-data)
+#
+# REMOVED: promtail
+#   Reason: Log collector for Loki (no longer needed)
+#   Action: Stopped
+#
+# REMOVED: tempo
+#   Reason: SigNoz provides distributed tracing
+#   Action: Stopped, volume preserved (k12-tempo-data)
+#
+# REMOVED: otel-collector
+#   Reason: Conflicts with SigNoz architecture (see note below)
+#   Action: Stopped
+#
+# =============================================================================
+# IMPORTANT NOTE: SigNoz Configuration
+# =============================================================================
+#
+# The current signoz/signoz:latest image includes:
+#   ✅ UI and Backend (port 8080 → 3301)
+#   ✅ ClickHouse integration
+#   ✅ API endpoints
+#   ✅ Dashboards and visualization
+#   ❌ NO OTLP receiver (traces/metrics/logs cannot be ingested)
+#
+# To make SigNoz fully functional for trace ingestion, you need to either:
+#
+# Option 1: Use Official SigNoz Docker Compose (RECOMMENDED)
+#   Download: https://github.com/SigNoz/signoz/blob/main/deploy/docker/
+#   Includes: signoz-backend, signoz-otelia, clickhouse, alert-manager
+#   Status: Complete, working solution
+#
+# Option 2: Keep Tempo for Traces
+#   Tempo is already working and can coexist with SigNoz
+#   Use Tempo for traces, SigNoz for metrics/logs/UI
+#   Status: Minimal setup required
+#
+# Option 3: Direct Integration
+#   Configure Quarkus to export metrics directly to SigNoz
+#   Requires: Additional OTLP receiver component
+#   Status: Requires research and setup
+#
+# Current State:
+#   - UI: ✅ Accessible at http://localhost:3301
+#   - Backend: ✅ Running and connected to ClickHouse
+#   - Traces: ❌ Cannot ingest (missing OTLP receiver)
+#   - Metrics: ❌ Cannot ingest (missing OTLP receiver)
+#
+# Next Steps:
+#   1. Choose one of the options above
+#   2. See monitoring/SIGNOZ_TRACES_TEST_REPORT.md for full details
+#   3. See monitoring/SIGNOZ_FIX_REPORT.md for UI fix documentation
+#
+# =============================================================================

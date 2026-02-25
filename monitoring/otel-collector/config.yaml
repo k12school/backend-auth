@@ -1,4 +1,5 @@
 # OpenTelemetry Collector Configuration for K12 Backend
+# Full SigNoz Migration - Exports traces and metrics to SigNoz
 
 receivers:
   otlp:
@@ -12,31 +13,26 @@ processors:
   batch:
 
 exporters:
-  # Debug exporter - logs traces to console for verification
+  # Debug exporter - logs to console for verification
   debug:
-    verbosity: detailed
+    verbosity: normal
 
-  # OTLP exporter - sends traces to Tempo
-  # Note: Tempo listens on port 14317 (not 4317) to avoid conflict with collector
-  otlp/tempo:
-    endpoint: http://localhost:14317
-    tls:
-      insecure: true
-
-  # Prometheus remote write for metrics
-  prometheusremotewrite:
-    endpoint: http://prometheus:9090/api/v1/write
+  # SigNoz OTLP exporter - sends traces and metrics to SigNoz
+  otlp/signoz:
+    endpoint: localhost:4319  # SigNoz gRPC OTLP receiver (4319:4317)
     tls:
       insecure: true
 
 service:
   pipelines:
+    # Traces pipeline - sends to SigNoz
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug, otlp/tempo]
+      exporters: [debug, otlp/signoz]
 
+    # Metrics pipeline - sends to SigNoz
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [prometheusremotewrite]
+      exporters: [otlp/signoz]
