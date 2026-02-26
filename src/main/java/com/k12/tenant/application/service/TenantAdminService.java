@@ -9,6 +9,7 @@ import com.k12.tenant.infrastructure.rest.dto.TenantAdminResponse;
 import com.k12.user.domain.models.EmailAddress;
 import com.k12.user.domain.models.PasswordHash;
 import com.k12.user.domain.models.User;
+import com.k12.user.domain.models.UserFactory;
 import com.k12.user.domain.models.UserName;
 import com.k12.user.domain.models.UserRole;
 import com.k12.user.domain.models.error.UserError;
@@ -16,14 +17,13 @@ import com.k12.user.domain.models.events.UserEvents;
 import com.k12.user.domain.models.specialization.admin.Admin;
 import com.k12.user.domain.models.specialization.admin.AdminFactory;
 import com.k12.user.domain.models.specialization.admin.AdminId;
-import com.k12.user.domain.models.UserFactory;
 import com.k12.user.domain.ports.out.AdminRepository;
 import com.k12.user.domain.ports.out.UserRepository;
 import com.k12.user.infrastructure.security.PasswordHasher;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import java.util.Optional;
@@ -64,10 +64,10 @@ public class TenantAdminService {
         try (var scope = span.makeCurrent()) {
             // Step 1: Validate tenant exists
             var tenantResult = tenantService.getTenant(tenantId);
-            if (tenantResult.isError()) {
+            if (tenantResult.isFailure()) {
                 log.warn("Tenant not found: {}", tenantId.value());
                 span.setStatus(StatusCode.ERROR, "Tenant not found");
-                return Result.failure(TenantAdminError.TenantNotFoundError.TENANT_NOT_FOUND);
+                return Result.failure(TenantAdminError.ConflictError.TENANT_NOT_FOUND);
             }
 
             // Step 2: Check if email already exists
@@ -111,24 +111,21 @@ public class TenantAdminService {
             }
 
             // Step 5: Create User with ADMIN role
-            Result<UserEvents, UserError> userResult = UserFactory.create(
-                    emailAddress,
-                    passwordHash,
-                    Set.of(UserRole.ADMIN),
-                    userName);
+            Result<UserEvents, UserError> userResult =
+                    UserFactory.create(emailAddress, passwordHash, Set.of(UserRole.ADMIN), userName);
 
-            if (userResult.isError()) {
+            if (userResult.isFailure()) {
                 log.error("User creation failed");
                 span.setStatus(StatusCode.ERROR, "User creation failed");
                 return Result.failure(TenantAdminError.PersistenceError.USER_CREATION_FAILED);
             }
 
-            UserEvents.UserCreated userCreated = (UserEvents.UserCreated) userResult.getSuccess();
+            UserEvents.UserCreated userCreated = (UserEvents.UserCreated) userResult.get();
             UserId userId = userCreated.userId();
 
             // Step 6: Save User with tenant association
-            User user =
-                    new User(userId, emailAddress, passwordHash, Set.of(UserRole.ADMIN), userCreated.status(), userName);
+            User user = new User(
+                    userId, emailAddress, passwordHash, Set.of(UserRole.ADMIN), userCreated.status(), userName);
             userRepository.save(user);
 
             // Step 7: Create Admin aggregate
