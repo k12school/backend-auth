@@ -2,7 +2,7 @@ package com.k12.infrastructure.logging;
 
 import io.opentelemetry.api.logs.Logger;
 import io.opentelemetry.api.logs.Severity;
-import io.opentelemetry.exporter.otlp.http.logs.OtlpHttpLogRecordExporter;
+import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter;
 import io.opentelemetry.sdk.logs.SdkLoggerProvider;
 import io.opentelemetry.sdk.logs.export.BatchLogRecordProcessor;
 import io.opentelemetry.sdk.resources.Resource;
@@ -15,7 +15,7 @@ import java.util.logging.LogRecord;
  * Custom Log Handler that exports logs to SigNoz via OpenTelemetry OTLP.
  *
  * <p>This handler creates a standalone OpenTelemetry LoggerProvider that sends
- * application logs directly to SigNoz using the OTLP protocol over HTTP.
+ * application logs directly to SigNoz using the OTLP protocol.
  */
 public class OpenTelemetryLogHandler extends Handler {
 
@@ -23,18 +23,9 @@ public class OpenTelemetryLogHandler extends Handler {
     private final SdkLoggerProvider loggerProvider;
 
     public OpenTelemetryLogHandler() {
-        // Read from environment variable first, fall back to system property, then default
-        // This matches Quarkus configuration precedence
-        String otelEndpoint = System.getenv()
-                .getOrDefault(
-                        "QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT",
-                        System.getProperty(
-                                "quarkus.otel.exporter.otlp.endpoint", "http://k12-signoz-otel-collector:4318"));
+        // Get configuration from system properties
+        String otelEndpoint = System.getProperty("quarkus.otel.exporter.otlp.endpoint", "http://localhost:4317");
         String serviceName = System.getProperty("quarkus.application.name", "k12-backend");
-
-        // Print resolved configuration for debugging
-        System.out.println("[OpenTelemetryLogHandler] Initializing with endpoint: " + otelEndpoint);
-        System.out.println("[OpenTelemetryLogHandler] Service name: " + serviceName);
 
         // Configure resource
         Resource resource = Resource.getDefault().toBuilder()
@@ -43,9 +34,9 @@ public class OpenTelemetryLogHandler extends Handler {
                 .put("deployment.environment", "development")
                 .build();
 
-        // Create OTLP log exporter using HTTP (same protocol as traces)
-        OtlpHttpLogRecordExporter exporter =
-                OtlpHttpLogRecordExporter.builder().setEndpoint(otelEndpoint).build();
+        // Create OTLP log exporter
+        OtlpGrpcLogRecordExporter exporter =
+                OtlpGrpcLogRecordExporter.builder().setEndpoint(otelEndpoint).build();
 
         // Create logger provider with batch processor
         this.loggerProvider = SdkLoggerProvider.builder()
@@ -63,12 +54,6 @@ public class OpenTelemetryLogHandler extends Handler {
 
     @Override
     public void publish(LogRecord record) {
-        // Debug: log every call to see if handler is being invoked
-        if (record.getSequenceNumber() % 50 == 0) {
-            System.out.println("[OpenTelemetryLogHandler] publish() called - isLoggable: " + isLoggable(record)
-                    + ", otelLogger: " + (otelLogger != null));
-        }
-
         if (!isLoggable(record) || otelLogger == null) {
             return;
         }
@@ -83,8 +68,8 @@ public class OpenTelemetryLogHandler extends Handler {
                 message = message + "\n" + record.getThrown().toString();
             }
 
-            // Debug: print every 50th log to show handler is working
-            if (record.getSequenceNumber() % 50 == 0) {
+            // Debug: print every 100th log to show handler is working
+            if (record.getSequenceNumber() % 100 == 0) {
                 System.out.println("[OpenTelemetryLogHandler] Exporting log #" + record.getSequenceNumber() + ": "
                         + record.getLevel() + " - " + message);
             }

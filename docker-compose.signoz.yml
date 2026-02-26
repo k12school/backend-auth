@@ -1,0 +1,115 @@
+# =============================================================================
+# SigNoz Observability Stack
+# =============================================================================
+# Single OTLP ingestion backend for traces, metrics, and logs
+#
+# Usage:
+#   docker compose -f docker-compose.signoz.yml up -d
+#
+# Architecture:
+#   k12-backend → OTLP → SigNoz Collector → ClickHouse → SigNoz UI
+#
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # CLICKHOUSE - Telemetry Storage Backend
+  # ============================================
+  k12-clickhouse:
+    image: clickhouse/clickhouse-server:25.5.6
+    container_name: k12-clickhouse
+    ports:
+      - "8123:8123"  # HTTP interface (for queries/debug)
+      - "9000:9000"  # Native interface (for OTel collector)
+    environment:
+      CLICKHOUSE_DB: signoz_traces
+      CLICKHOUSE_USER: root
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - k12-clickhouse-data:/var/lib/clickhouse
+    networks:
+      - k12-signoz-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ============================================
+  # SIGNOZ OTLP COLLECTOR - Telemetry Ingestion
+  # ============================================
+  k12-signoz-otel-collector:
+    image: signoz/signoz-otel-collector:v0.142.1
+    container_name: k12-signoz-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver
+      - "13133:13133"  # Health check
+    volumes:
+      - ./monitoring/signoz-otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    networks:
+      - k12-signoz-net
+    depends_on:
+      k12-clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:13133/health/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # SIGNOZ UI - Observability Dashboard
+  # ============================================
+  k12-signoz:
+    image: signoz/signoz:v0.112.1
+    container_name: k12-signoz
+    ports:
+      - "3301:8080"  # SigNoz frontend UI
+    environment:
+      # ClickHouse connection
+      CLICKHOUSE_DATABASE: signoz_traces
+      CLICKHOUSE_USER: root
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_HOST: k12-clickhouse
+      CLICKHOUSE_PORT: 9000
+      # Storage paths
+      SIGNOZ_TELEMETRYSTORE_PROVIDER: clickhouse
+      QUERY_CACHE_PATH: /var/lib/signoz/cache
+      # JWT secret for session management
+      SIGNOZ_TOKENIZER_JWT_SECRET: change-this-to-a-strong-random-secret-key-min-32-chars
+      # Disable telemetry/version check for local dev
+      SIGNOZ_TELEMETRY_ENABLED: "false"
+      SIGNOZ_VERSION_CHECK_ENABLED: "false"
+    volumes:
+      - k12-signoz-data:/var/lib/signoz
+    networks:
+      - k12-signoz-net
+    depends_on:
+      k12-clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  k12-signoz-net:
+    name: k12-signoz-net
+    driver: bridge
+
+volumes:
+  k12-clickhouse-data:
+    name: k12-clickhouse-data
+  k12-signoz-data:
+    name: k12-signoz-data

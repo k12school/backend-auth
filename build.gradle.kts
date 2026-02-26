@@ -29,13 +29,14 @@ dependencies {
     implementation("io.quarkus:quarkus-smallrye-jwt-build")
     implementation("io.quarkus:quarkus-smallrye-openapi")
     implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
-    implementation("io.quarkus:quarkus-opentelemetry")
-    implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.45.0")
-    // OpenTelemetry Logs SDK for log export
-    implementation("io.opentelemetry:opentelemetry-sdk-logs:1.45.0")
+    // Micrometer + OpenTelemetry bridge (sends metrics via OTLP)
+    implementation("io.quarkus:quarkus-micrometer-opentelemetry")
     // JBoss Log Manager for custom handler
     implementation("org.jboss.logmanager:jboss-logmanager:3.2.0.Final")
+
+    // OpenTelemetry Logs SDK (for custom log handler)
+    implementation("io.opentelemetry:opentelemetry-sdk-logs:1.45.0")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.45.0")
     implementation("io.quarkus:quarkus-agroal")
     implementation("io.quarkus:quarkus-jdbc-postgresql")
     implementation("io.quarkus:quarkus-flyway")
@@ -73,8 +74,8 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 tasks.withType<JavaCompile> {

@@ -32,7 +32,6 @@ services:
     container_name: k12-backend
     ports:
       - "8080:8080"  # HTTP API
-      - "5005:5005"  # Debug
     environment:
       # Quarkus configuration
       QUARKUS_HTTP_HOST: 0.0.0.0
@@ -41,37 +40,22 @@ services:
       QUARKUS_DATASOURCE_PASSWORD: k12_password
       QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://k12-postgres:5432/k12_db
 
-      # OpenTelemetry configuration
-      QUARKUS_OTEL_ENABLED: "true"
-      # Use HTTP/JSON protocol (port 4318) instead of gRPC (port 4317)
-      QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT: http://k12-signoz-otel-collector:4318
-      QUARKUS_OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      QUARKUS_OTEL_TRACES_SAMPLER: always_on
-      QUARKUS_OTEL_RESOURCE_ATTRIBUTES: "service.name=k12-backend,deployment.environment=development"
-
       # JWT configuration
       JWT_SECRET: k12-default-secret-key-for-jwt-token-signing-min-256-bits
 
       # Logging configuration for SigNoz
       QUARKUS_LOG_LEVEL: INFO
       QUARKUS_LOG_CATEGORY_"com.k12"_LEVEL: INFO
-      QUARKUS_LOG_HANDLER_JSON_ENABLED: "true"
 
-      # OTLP debug logging to diagnose export failures
-      QUARKUS_LOG_CATEGORY_"io.opentelemetry".level: TRACE
-      QUARKUS_LOG_CATEGORY_"io.quarkus.opentelemetry".level: TRACE
-      QUARKUS_LOG_CATEGORY_"io.vertx".level: TRACE
-
-      # Enable file logging for log collection
-      QUARKUS_LOG_FILE_ENABLED: "true"
-      QUARKUS_LOG_FILE_PATH: /app/log/k12-backend.log
-      QUARKUS_LOG_FILE_LEVEL: INFO
-      QUARKUS_LOG_FILE_FORMAT: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n"
+      # OpenTelemetry resource attributes
+      OTEL_SERVICE_NAME: k12-backend
+      OTEL_RESOURCE_ATTRIBUTES: service.name=k12-backend,deployment.environment=local
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+        labels: "service=k12-backend"
     networks:
       - k12-monitoring
       - k12-signoz-net

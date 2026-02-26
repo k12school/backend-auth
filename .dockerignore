@@ -20,6 +20,8 @@ gradle-app.setting
 
 # Monitoring (we don't need this in the app container)
 monitoring/
+# But keep OpenTelemetry Java Agent
+!monitoring/opentelemetry/opentelemetry-javaagent.jar
 
 # Docker
 docker-compose*.yml
