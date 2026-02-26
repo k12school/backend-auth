@@ -1,10 +1,14 @@
 package com.k12.tenant.infrastructure.rest.resource;
 
 import com.k12.common.domain.model.TenantId;
+import com.k12.tenant.application.service.TenantAdminService;
 import com.k12.tenant.application.service.TenantService;
+import com.k12.tenant.domain.models.error.TenantAdminError;
 import com.k12.tenant.domain.models.events.TenantEvents;
+import com.k12.tenant.infrastructure.rest.dto.CreateTenantAdminRequest;
 import com.k12.tenant.infrastructure.rest.dto.CreateTenantRequest;
 import com.k12.tenant.infrastructure.rest.dto.ErrorResponse;
+import com.k12.tenant.infrastructure.rest.dto.TenantAdminResponse;
 import com.k12.tenant.infrastructure.rest.dto.TenantResponse;
 import com.k12.tenant.infrastructure.rest.mapper.ErrorResponseMapper;
 import io.opentelemetry.api.trace.Span;
@@ -35,6 +39,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 public class TenantResource {
 
     private final TenantService tenantService;
+    private final TenantAdminService tenantAdminService;
     private final Tracer tracer;
 
     @POST
@@ -252,6 +257,64 @@ public class TenantResource {
         return result.fold(this::noContent, ErrorResponseMapper::toResponse);
     }
 
+    @POST
+    @Path("/{id}/admins")
+    @Operation(
+            summary = "Create a tenant administrator",
+            description = "Creates a new ADMIN user and Admin specialization for a specific tenant")
+    @APIResponses({
+        @APIResponse(
+                responseCode = "201",
+                description = "Admin created successfully",
+                content = @Content(schema = @Schema(implementation = TenantAdminResponse.class))),
+        @APIResponse(
+                responseCode = "400",
+                description = "Invalid request data",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @APIResponse(responseCode = "403", description = "Forbidden - SUPER_ADMIN role required"),
+        @APIResponse(
+                responseCode = "404",
+                description = "Tenant not found",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @APIResponse(
+                responseCode = "409",
+                description = "Email already exists",
+                content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    public Response createTenantAdmin(
+            @Parameter(description = "Tenant ID", required = true, example = "123e4567-e89b-12d3-a456-426614174000")
+                    @PathParam("id")
+                    String id,
+            @Valid CreateTenantAdminRequest request) {
+
+        Span span = tracer.spanBuilder("TenantResource.createTenantAdmin")
+                .setSpanKind(SpanKind.SERVER)
+                .startSpan();
+
+        try (var scope = span.makeCurrent()) {
+            TenantId tenantId = new TenantId(id);
+            var result = tenantAdminService.createTenantAdmin(tenantId, request);
+
+            return result.fold(
+                    success -> {
+                        span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
+                        return Response.status(Response.Status.CREATED.getStatusCode())
+                                .entity(success)
+                                .build();
+                    },
+                    error -> {
+                        span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, error.toString());
+                        return toErrorResponse(error);
+                    });
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
+        }
+    }
+
     private Response created(TenantEvents event) {
         return Response.status(Response.Status.CREATED).entity(toDTO(event)).build();
     }
@@ -316,4 +379,38 @@ public class TenantResource {
 
             @Schema(description = "Current status of the tenant", examples = "ACTIVE")
             String status) {}
+
+    private Response toErrorResponse(TenantAdminError error) {
+        return switch (error) {
+            case TenantAdminError.ConflictError.TENANT_NOT_FOUND ->
+                Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorResponse("TENANT_NOT_FOUND", "Tenant not found"))
+                    .build();
+            case TenantAdminError.ConflictError.EMAIL_ALREADY_EXISTS ->
+                Response.status(Response.Status.CONFLICT)
+                    .entity(new ErrorResponse("EMAIL_ALREADY_EXISTS", "Email already exists"))
+                    .build();
+            case TenantAdminError.ValidationError.INVALID_EMAIL ->
+                Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse("INVALID_EMAIL", "Invalid email format"))
+                    .build();
+            case TenantAdminError.ValidationError.INVALID_PASSWORD ->
+                Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse("INVALID_PASSWORD", "Password must be at least 8 characters"))
+                    .build();
+            case TenantAdminError.ValidationError.INVALID_NAME ->
+                Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse("INVALID_NAME", "Name cannot be blank"))
+                    .build();
+            case TenantAdminError.ValidationError.INVALID_PERMISSIONS ->
+                Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse("INVALID_PERMISSIONS", "At least one permission is required"))
+                    .build();
+            case TenantAdminError.PersistenceError.USER_CREATION_FAILED,
+                 TenantAdminError.PersistenceError.ADMIN_CREATION_FAILED ->
+                Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(new ErrorResponse(error.name(), "Failed to create admin"))
+                    .build();
+        };
+    }
 }
