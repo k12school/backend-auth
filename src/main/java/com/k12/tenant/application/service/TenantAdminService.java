@@ -15,17 +15,17 @@ import com.k12.user.domain.models.events.UserEvents;
 import com.k12.user.domain.models.specialization.admin.Admin;
 import com.k12.user.domain.models.specialization.admin.AdminFactory;
 import com.k12.user.domain.models.specialization.admin.AdminId;
+import com.k12.user.domain.models.UserFactory;
 import com.k12.user.domain.ports.out.AdminRepository;
 import com.k12.user.domain.ports.out.UserRepository;
 import com.k12.user.infrastructure.security.PasswordHasher;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Optional;
-import java.util.Set;
 
 /**
  * Application service for creating tenant administrators.
@@ -48,8 +48,7 @@ public class TenantAdminService {
      */
     @Transactional
     public Result<TenantAdminResponse, TenantAdminError> createTenantAdmin(
-            TenantId tenantId,
-            CreateTenantAdminRequest request) {
+            TenantId tenantId, CreateTenantAdminRequest request) {
         log.info("Creating tenant admin for tenant: {}", tenantId.value());
 
         // Step 1: Validate tenant exists
@@ -94,11 +93,10 @@ public class TenantAdminService {
 
         // Step 5: Create User with ADMIN role
         Result<UserEvents, ?> userResult = UserFactory.create(
-            emailAddress,
-            passwordHash,
-            Set.of(UserRole.ADMIN),  // HARDCODED AS ADMIN
-            userName
-        );
+                emailAddress,
+                passwordHash,
+                Set.of(UserRole.ADMIN), // HARDCODED AS ADMIN
+                userName);
 
         if (userResult.isError()) {
             log.error("User creation failed");
@@ -109,14 +107,8 @@ public class TenantAdminService {
         UserId userId = userCreated.userId();
 
         // Step 6: Save User with tenant association
-        User user = new User(
-            userId,
-            emailAddress,
-            passwordHash,
-            Set.of(UserRole.ADMIN),
-            userCreated.status(),
-            userName
-        );
+        User user =
+                new User(userId, emailAddress, passwordHash, Set.of(UserRole.ADMIN), userCreated.status(), userName);
         userRepository.save(user);
 
         // Step 7: Create Admin aggregate
