@@ -15,7 +15,6 @@ import com.k12.tenant.domain.models.error.TenantError;
 import com.k12.tenant.domain.models.events.TenantEvents;
 import com.k12.tenant.domain.port.TenantRepository;
 import com.k12.tenant.infrastructure.rest.dto.CreateTenantRequest;
-import io.micrometer.core.annotation.Timed;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
@@ -39,10 +38,6 @@ public class TenantService {
      * @param request The create tenant request
      * @return Result containing TenantCreated event or error
      */
-    @Timed(
-            value = "tenant.create",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to create a new tenant")
     public Result<TenantEvents, TenantError> createTenant(CreateTenantRequest request) {
         Span span = tracer.spanBuilder("TenantService.createTenant")
                 .setSpanKind(SpanKind.INTERNAL)
@@ -99,10 +94,6 @@ public class TenantService {
      * @param tenantId The tenant ID
      * @return Result containing the tenant or error
      */
-    @Timed(
-            value = "tenant.get",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to load a tenant")
     public Result<Tenant, TenantError> getTenant(TenantId tenantId) {
         Span span = tracer.spanBuilder("TenantService.getTenant")
                 .setSpanKind(SpanKind.INTERNAL)
@@ -195,10 +186,6 @@ public class TenantService {
     /**
      * Activates a tenant.
      */
-    @Timed(
-            value = "tenant.activate",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to activate a tenant")
     public Result<TenantEvents, TenantError> activateTenant(TenantId tenantId) {
         return processCommand(tenantId, new ActivateTenant(tenantId));
     }
@@ -206,10 +193,6 @@ public class TenantService {
     /**
      * Suspends a tenant.
      */
-    @Timed(
-            value = "tenant.suspend",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to suspend a tenant")
     public Result<TenantEvents, TenantError> suspendTenant(TenantId tenantId) {
         return processCommand(tenantId, new SuspendTenant(tenantId));
     }

@@ -14,10 +14,6 @@ import com.k12.tenant.domain.models.error.TenantError;
 import com.k12.tenant.domain.models.events.TenantEvents;
 import com.k12.tenant.domain.port.TenantRepository;
 import io.agroal.api.AgroalDataSource;
-import io.micrometer.core.annotation.Timed;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
@@ -51,14 +47,9 @@ import org.jooq.impl.DSL;
 public class TenantRepositoryImpl implements TenantRepository {
 
     private final AgroalDataSource dataSource;
-    private final MeterRegistry meterRegistry;
     private final Tracer tracer;
 
     @Override
-    @Timed(
-            value = "db.tenant.append",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to append event to database")
     @Transactional
     public Result<Void, TenantError> append(TenantEvents event, long expectedVersion) {
         Span span = tracer.spanBuilder("TenantRepository.append")
@@ -91,7 +82,6 @@ public class TenantRepositoryImpl implements TenantRepository {
 
                 // If 0 rows inserted, version already exists => conflict
                 if (inserted == 0) {
-                    recordError("VERSION_CONFLICT");
                     span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, "VERSION_CONFLICT");
                     return Result.failure(VERSION_CONFLICT);
                 }
@@ -103,12 +93,10 @@ public class TenantRepositoryImpl implements TenantRepository {
                 return Result.success(null);
             } catch (IntegrityConstraintViolationException e) {
                 // Catch any other constraint violations
-                recordError("STORAGE_ERROR_CONSTRAINT");
                 span.recordException(e);
                 span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
                 return Result.failure(STORAGE_ERROR);
             } catch (Exception e) {
-                recordError("STORAGE_ERROR_EXCEPTION");
                 span.recordException(e);
                 span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
                 return Result.failure(STORAGE_ERROR);
@@ -119,10 +107,6 @@ public class TenantRepositoryImpl implements TenantRepository {
     }
 
     @Override
-    @Timed(
-            value = "db.tenant.loadEvents",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to load events from database")
     public Result<List<TenantEvents>, TenantError> loadEvents(TenantId tenantId) {
         Span span = tracer.spanBuilder("TenantRepository.loadEvents")
                 .setSpanKind(SpanKind.INTERNAL)
@@ -162,15 +146,10 @@ public class TenantRepositoryImpl implements TenantRepository {
                     events.add(KryoEventSerializer.deserialize(eventData));
                 }
 
-                // Record event count for this tenant
-                int eventCount = events.size();
-                recordEventCount(tenantId.value(), eventCount);
-
                 span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
                 querySpan.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
                 return Result.success(events);
             } catch (Exception e) {
-                recordError("LOAD_EVENTS_ERROR");
                 querySpan.recordException(e);
                 querySpan.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
                 return Result.failure(STORAGE_ERROR);
@@ -178,7 +157,6 @@ public class TenantRepositoryImpl implements TenantRepository {
                 querySpan.end();
             }
         } catch (Exception e) {
-            recordError("LOAD_EVENTS_ERROR");
             span.recordException(e);
             span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
             return Result.failure(STORAGE_ERROR);
@@ -188,10 +166,6 @@ public class TenantRepositoryImpl implements TenantRepository {
     }
 
     @Override
-    @Timed(
-            value = "db.tenant.load",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to load and reconstruct tenant")
     public Result<Tenant, TenantError> load(TenantId tenantId) {
         var eventsResult = loadEvents(tenantId);
         if (eventsResult.isFailure()) {
@@ -217,16 +191,11 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             return Result.success(version);
         } catch (Exception e) {
-            recordError("GET_VERSION_ERROR");
             return Result.failure(STORAGE_ERROR);
         }
     }
 
     @Override
-    @Timed(
-            value = "db.tenant.nameExists",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to check if tenant name exists")
     public Result<Boolean, TenantError> nameExists(String name) {
         Span span = tracer.spanBuilder("TenantRepository.nameExists")
                 .setSpanKind(SpanKind.INTERNAL)
@@ -240,7 +209,6 @@ public class TenantRepositoryImpl implements TenantRepository {
                 span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
                 return Result.success(exists);
             } catch (Exception e) {
-                recordError("NAME_EXISTS_ERROR");
                 span.recordException(e);
                 span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
                 return Result.failure(STORAGE_ERROR);
@@ -251,10 +219,6 @@ public class TenantRepositoryImpl implements TenantRepository {
     }
 
     @Override
-    @Timed(
-            value = "db.tenant.subdomainExists",
-            percentiles = {0.5, 0.95, 0.99},
-            description = "Time to check if subdomain exists")
     public Result<Boolean, TenantError> subdomainExists(String subdomain) {
         Span span = tracer.spanBuilder("TenantRepository.subdomainExists")
                 .setSpanKind(SpanKind.INTERNAL)
@@ -268,7 +232,6 @@ public class TenantRepositoryImpl implements TenantRepository {
                 span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
                 return Result.success(exists);
             } catch (Exception e) {
-                recordError("SUBDOMAIN_EXISTS_ERROR");
                 span.recordException(e);
                 span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
                 return Result.failure(STORAGE_ERROR);
@@ -290,7 +253,6 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             return id != null ? Optional.of(new TenantId(id.toString())) : Optional.empty();
         } catch (Exception e) {
-            recordError("FIND_BY_NAME_ERROR");
             return Optional.empty();
         }
     }
@@ -307,32 +269,8 @@ public class TenantRepositoryImpl implements TenantRepository {
 
             return id != null ? Optional.of(new TenantId(id.toString())) : Optional.empty();
         } catch (Exception e) {
-            recordError("FIND_BY_SUBDOMAIN_ERROR");
             return Optional.empty();
         }
-    }
-
-    /**
-     * Record error for metrics tracking.
-     */
-    private void recordError(String errorType) {
-        Counter.builder("tenant.repository.errors")
-                .description("Repository errors by type")
-                .tag("error_type", errorType)
-                .register(meterRegistry)
-                .increment();
-    }
-
-    /**
-     * Record event count for a tenant.
-     */
-    private void recordEventCount(String tenantId, int count) {
-        // Use AtomicInteger to allow Gauge to track changes
-        Gauge.builder("tenant.events.count", () -> count)
-                .description("Number of events for tenant")
-                .tags("tenant_id", tenantId)
-                .strongReference(true)
-                .register(meterRegistry);
     }
 
     /**
@@ -384,7 +322,12 @@ public class TenantRepositoryImpl implements TenantRepository {
                         .where(TENANTS.ID.eq(UUID.fromString(tenantId.value())))
                         .execute();
             }
-            case TenantEvents.TenantNameUpdated(var tenantId, var newName, var _, var updatedAt, var version) -> {
+            case TenantEvents.TenantNameUpdated(
+                    var tenantId,
+                    var newName,
+                    var subdomain,
+                    var updatedAt,
+                    var version) -> {
                 OffsetDateTime timestamp = OffsetDateTime.ofInstant(updatedAt, ZoneOffset.UTC);
                 ctx.update(TENANTS)
                         .set(TENANTS.NAME, newName.value())
@@ -396,7 +339,7 @@ public class TenantRepositoryImpl implements TenantRepository {
             case TenantEvents.TenantSubdomainUpdated(
                     var tenantId,
                     var newSubdomain,
-                    var _,
+                    var name,
                     var updatedAt,
                     var version) -> {
                 OffsetDateTime timestamp = OffsetDateTime.ofInstant(updatedAt, ZoneOffset.UTC);
@@ -433,14 +376,22 @@ public class TenantRepositoryImpl implements TenantRepository {
 
     private UUID extractTenantIdUUID(TenantEvents event) {
         return switch (event) {
-            case TenantEvents.TenantCreated(var tenantId, var _, var _, var _, var _, var _) ->
+            case TenantEvents.TenantCreated(
+                    var tenantId,
+                    var name,
+                    var subdomain,
+                    var status,
+                    var createdAt,
+                    var version) -> UUID.fromString(tenantId.value());
+            case TenantEvents.TenantSuspended(var tenantId, var suspendedAt, var version) ->
                 UUID.fromString(tenantId.value());
-            case TenantEvents.TenantSuspended(var tenantId, var _, var _) -> UUID.fromString(tenantId.value());
-            case TenantEvents.TenantActivated(var tenantId, var _, var _) -> UUID.fromString(tenantId.value());
-            case TenantEvents.TenantDeactivated(var tenantId, var _, var _) -> UUID.fromString(tenantId.value());
+            case TenantEvents.TenantActivated(var tenantId, var activatedAt, var version) ->
+                UUID.fromString(tenantId.value());
+            case TenantEvents.TenantDeactivated(var tenantId, var deactivatedAt, var version) ->
+                UUID.fromString(tenantId.value());
             case TenantEvents.TenantDeleted(var tenantId, var deletedAt, var version) ->
                 UUID.fromString(tenantId.value());
-            case TenantEvents.TenantNameUpdated(var tenantId, var _, var _, var _, var _) ->
+            case TenantEvents.TenantNameUpdated(var tenantId, var newName, var subdomain, var updatedAt, var version) ->
                 UUID.fromString(tenantId.value());
             case TenantEvents.TenantSubdomainUpdated(
                     var tenantId,
