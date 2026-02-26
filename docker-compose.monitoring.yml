@@ -1,207 +1,184 @@
-# Monitoring Stack: SigNoz + Compatible Components
-# Usage: docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
-#
-# NOTE: SigNoz currently provides UI and backend, but requires additional components
-# for full trace/metric/log ingestion. See monitoring/SIGNOZ_TRACES_TEST_REPORT.md for details.
+# Official SigNoz Monitoring Stack - Full Setup with ZooKeeper
+# Based on: https://github.com/SigNoz/signoz/main/deploy/docker/docker-compose.yaml
 
 services:
   # ============================================
-  # CLICKHOUSE - SigNoz Database Backend
+  # INIT CLICKHOUSE - Run setup scripts
+  # ============================================
+  init-clickhouse:
+    image: clickhouse/clickhouse-server:25.5.6
+    container_name: k12-init-clickhouse
+    command:
+      - bash
+      - -c
+      - |
+        version="v0.0.1"
+        node_os=$$(uname -s | tr '[:upper:]' '[:lower:]')
+        node_arch=$$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+        echo "Fetching histogram-binary for $${node_os}/$${node_arch}"
+        cd /tmp
+        wget -O histogram-quantile.tar.gz "https://github.com/SigNoz/signoz/releases/download/histogram-quantile%2F$${version}/histogram-quantile_$${node_os}_$${node_arch}.tar.gz"
+        tar -xvzf histogram-quantile.tar.gz
+        mkdir -p /var/lib/clickhouse/user_scripts
+        mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
+    volumes:
+      - k12-clickhouse-data:/var/lib/clickhouse
+      - ./monitoring/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
+    networks:
+      - k12-monitoring
+    restart: on-failure
+
+  # ============================================
+  # ZOOKEEPER - Required for ClickHouse cluster
+  # ============================================
+  zookeeper:
+    image: signoz/zookeeper:3.7.1
+    container_name: k12-zookeeper
+    environment:
+      - ZOO_SERVER_ID=1
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_AUTOPURGE_INTERVAL=1
+      - ZOO_ENABLE_PROMETHEUS_METRICS=yes
+      - ZOO_PROMETHEUS_METRICS_PORT_NUMBER=9141
+    volumes:
+      - k12-zookeeper-data:/bitnami/zookeeper
+    networks:
+      - k12-monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -m 2 http://localhost:8080/commands/ruok | grep error | grep null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # CLICKHOUSE - Database with cluster setup
   # ============================================
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:25.5.6
     container_name: k12-clickhouse
     ports:
       - "8123:8123"  # HTTP interface
       - "9000:9000"  # Native interface
-    environment:
-      CLICKHOUSE_DB: signoz
-      CLICKHOUSE_USER: root
-      CLICKHOUSE_PASSWORD: password
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
-      - clickhouse-data:/var/lib/clickhouse
+      - k12-clickhouse-data:/var/lib/clickhouse/
+      - ./monitoring/clickhouse/config.xml:/etc/clickhouse-server/config.xml
+      - ./monitoring/clickhouse/users.xml:/etc/clickhouse-server/users.xml
+      - ./monitoring/clickhouse/custom-function.xml:/etc/clickhouse-server/custom-function.xml
+      - ./monitoring/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml
+      - ./monitoring/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
     networks:
-      - monitoring
-    restart: unless-stopped
+      - k12-monitoring
+    depends_on:
+      init-clickhouse:
+        condition: service_completed_successfully
+      zookeeper:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
-      retries: 5
+      retries: 3
+    restart: unless-stopped
 
   # ============================================
-  # SIGNOZ - Observability Platform (UI + Backend)
+  # SIGNOZ OTEL COLLECTOR - Receives telemetry
   # ============================================
-  signoz:
-    image: signoz/signoz:latest  # Enterprise Edition
-    container_name: k12-signoz
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:latest
+    container_name: k12-signoz-otel-collector
+    command:
+      - --config=/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver
+    volumes:
+      - ./monitoring/signoz-otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=host.name=k12-host,os.type=linux
+      - LOW_CARDINAL_EXCEPTION_GROUPING=false
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION=true
+      - SIGNOZ_OTEL_COLLECTOR_TIMEOUT=10m
+    networks:
+      - k12-monitoring
     depends_on:
       clickhouse:
         condition: service_healthy
-    ports:
-      - "3301:8080"  # SigNoz frontend UI (external 3301 -> internal 8080)
-    environment:
-      - CLICKHOUSE_DATABASE=signoz
-      - CLICKHOUSE_USER=root
-      - CLICKHOUSE_PASSWORD=password
-      - CLICKHOUSE_HOST=clickhouse
-      - CLICKHOUSE_PORT=9000
-      - SIGNOZ_TELEMETRY_ENABLED=false
-      - SIGNOZ_VERSION_CHECK_ENABLED=false
-      - SIGNOZ_TELEMETRYSTORE_PROVIDER=clickhouse
-      - SIGNOZ_TOKENIZER_JWT_SECRET=change-this-to-a-strong-random-secret-key-min-32-chars
-      - QUERY_CACHE_PATH=/var/lib/signoz/cache
-    volumes:
-      - signoz-data:/var/lib/signoz
-    networks:
-      - monitoring
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # ============================================
-  # NODE EXPORTER - Host Metrics (Compatible)
+  # SIGNOZ TELEMETRY STORE MIGRATOR - Creates databases
   # ============================================
-  node-exporter:
-    image: prom/node-exporter:v1.8.2
-    container_name: k12-node-exporter
+  signoz-telemetrystore-migrator:
+    image: signoz/signoz-otel-collector:latest
+    container_name: k12-signoz-telemetrystore-migrator
+    environment:
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION=true
+      - SIGNOZ_OTEL_COLLECTOR_TIMEOUT=10m
+    entrypoint:
+      - /bin/sh
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    ports:
-      - "9100:9100"
-    restart: unless-stopped
+      - -c
+      - |
+        /signoz-otel-collector migrate bootstrap &&
+        /signoz-otel-collector migrate sync up &&
+        /signoz-otel-collector migrate async up
     networks:
-      - monitoring
+      - k12-monitoring
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: on-failure
 
   # ============================================
-  # CADVISOR - Container Metrics (Compatible)
+  # SIGNOZ - Frontend & Backend UI
   # ============================================
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.51.0
-    container_name: k12-cadvisor
-    privileged: true
-    devices:
-      - /dev/kmsg:/dev/kmsg
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
+  signoz:
+    image: signoz/signoz:latest
+    container_name: k12-signoz
     ports:
-      - "8081:8080"
-    restart: unless-stopped
-    networks:
-      - monitoring
-
-  # ============================================
-  # POSTGRES EXPORTER - Database Metrics (Compatible)
-  # ============================================
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:v0.15.0
-    container_name: k12-postgres-exporter
+      - "3301:8080"  # Frontend UI
     environment:
-      DATA_SOURCE_NAME: "postgresql://k12_user:k12_password@host.docker.internal:15432/k12_db?sslmode=disable"
-    ports:
-      - "9187:9187"
-    network_mode: host
-    restart: unless-stopped
-
-  # ============================================
-  # UPTIME KUMA - External Monitoring (Independent)
-  # ============================================
-  uptime-kuma:
-    image: louislam/uptime-kuma:1.23.15
-    container_name: k12-uptime-kuma
+      - SIGNOZ_TELEMETRY_ENABLED=false
+      - SIGNOZ_TELEMETRYSTORE_PROVIDER=clickhouse
+      - SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_SQLSTORE_SQLITE_PATH=/var/lib/signoz/signoz.db
+      - OTEL_COLLECTOR_ENDPOINT=k12-signoz-otel-collector:4317
+      - STORAGE=clickhouse
+      - SIGNOZ_TOKENIZER_JWT_SECRET=k12-jwt-secret-min-32-chars-change-for-production
     volumes:
-      - uptime-kuma-data:/app/data
-    network_mode: host
+      - k12-signoz-data:/var/lib/signoz/
+    networks:
+      - k12-monitoring
+    depends_on:
+      signoz-otel-collector:
+        condition: service_started
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 networks:
-  monitoring:
-    driver: bridge
+  k12-monitoring:
     name: k12-monitoring
 
 volumes:
-  clickhouse-data:
+  k12-clickhouse-data:
     name: k12-clickhouse-data
-  signoz-data:
+  k12-signoz-data:
     name: k12-signoz-data
-  uptime-kuma-data:
-    name: k12-uptime-kuma-data
-
-# =============================================================================
-# REMOVED SERVICES (conflicted with SigNoz):
-# =============================================================================
-#
-# REMOVED: prometheus
-#   Reason: SigNoz provides metrics storage and querying
-#   Action: Stopped, volume preserved (k12-prometheus-data)
-#
-# REMOVED: grafana
-#   Reason: SigNoz provides built-in dashboards and visualization
-#   Action: Stopped, volume preserved (k12-grafana-data)
-#
-# REMOVED: loki
-#   Reason: SigNoz provides log aggregation and querying
-#   Action: Stopped, volume preserved (k12-loki-data)
-#
-# REMOVED: promtail
-#   Reason: Log collector for Loki (no longer needed)
-#   Action: Stopped
-#
-# REMOVED: tempo
-#   Reason: SigNoz provides distributed tracing
-#   Action: Stopped, volume preserved (k12-tempo-data)
-#
-# REMOVED: otel-collector
-#   Reason: Conflicts with SigNoz architecture (see note below)
-#   Action: Stopped
-#
-# =============================================================================
-# IMPORTANT NOTE: SigNoz Configuration
-# =============================================================================
-#
-# The current signoz/signoz:latest image includes:
-#   ✅ UI and Backend (port 8080 → 3301)
-#   ✅ ClickHouse integration
-#   ✅ API endpoints
-#   ✅ Dashboards and visualization
-#   ❌ NO OTLP receiver (traces/metrics/logs cannot be ingested)
-#
-# To make SigNoz fully functional for trace ingestion, you need to either:
-#
-# Option 1: Use Official SigNoz Docker Compose (RECOMMENDED)
-#   Download: https://github.com/SigNoz/signoz/blob/main/deploy/docker/
-#   Includes: signoz-backend, signoz-otelia, clickhouse, alert-manager
-#   Status: Complete, working solution
-#
-# Option 2: Keep Tempo for Traces
-#   Tempo is already working and can coexist with SigNoz
-#   Use Tempo for traces, SigNoz for metrics/logs/UI
-#   Status: Minimal setup required
-#
-# Option 3: Direct Integration
-#   Configure Quarkus to export metrics directly to SigNoz
-#   Requires: Additional OTLP receiver component
-#   Status: Requires research and setup
-#
-# Current State:
-#   - UI: ✅ Accessible at http://localhost:3301
-#   - Backend: ✅ Running and connected to ClickHouse
-#   - Traces: ❌ Cannot ingest (missing OTLP receiver)
-#   - Metrics: ❌ Cannot ingest (missing OTLP receiver)
-#
-# Next Steps:
-#   1. Choose one of the options above
-#   2. See monitoring/SIGNOZ_TRACES_TEST_REPORT.md for full details
-#   3. See monitoring/SIGNOZ_FIX_REPORT.md for UI fix documentation
-#
-# =============================================================================
+  k12-zookeeper-data:
+    name: k12-zookeeper-data

@@ -1,7 +1,6 @@
 package com.k12.user.domain.models.specialization.admin;
 
 import com.k12.user.domain.models.specialization.admin.valueobjects.Permission;
-
 import java.time.Instant;
 import java.util.Set;
 

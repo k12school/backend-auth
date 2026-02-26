@@ -1,0 +1,26 @@
+<yandex>
+    <zookeeper-servers>
+        <node index="1">
+            <host>zookeeper</host>
+            <port>2181</port>
+        </node>
+    </zookeeper-servers>
+    <clickhouse_remote_servers>
+        <cluster>
+            <shard>
+                <replica>
+                    <host>clickhouse</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </cluster>
+    </clickhouse_remote_servers>
+    <default_replica_path>/clickhouse/tables/{cluster}/{shard}/{database}/{table}</default_replica_path>
+    <default_replica_name>{replica}</default_replica_name>
+    <macros>
+        <shard>1</shard>
+        <replica>1</replica>
+    </macros>
+    <replicated_merge_tree_paths>/clickhouse/tables</replicated_merge_tree_paths>
+    <replicated_merge_tree_zookeeper_path>/</replicated_merge_tree_zookeeper_path>
+</yandex>

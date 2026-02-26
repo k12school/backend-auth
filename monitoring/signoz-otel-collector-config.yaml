@@ -12,11 +12,22 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  prometheus:
+    config:
+      global:
+        scrape_interval: 60s
+      scrape_configs:
+        - job_name: otel-collector
+          static_configs:
+          - targets:
+              - localhost:8888
+            labels:
+              job_name: otel-collector
 processors:
   batch:
-    send_batch_size: 100
-    send_batch_max_size: 200
-    timeout: 5s
+    send_batch_size: 10000
+    send_batch_max_size: 11000
+    timeout: 10s
   batch/meter:
     send_batch_max_size: 25000
     send_batch_size: 20000
@@ -57,24 +68,24 @@ extensions:
     endpoint: 0.0.0.0:1777
 exporters:
   clickhousetraces:
-    datasource: tcp://k12-clickhouse:9000/signoz_traces
+    datasource: tcp://clickhouse:9000/signoz_traces
     low_cardinal_exception_grouping: ${env:LOW_CARDINAL_EXCEPTION_GROUPING}
     use_new_schema: true
   signozclickhousemetrics:
-    dsn: tcp://k12-clickhouse:9000/signoz_metrics
+    dsn: tcp://clickhouse:9000/signoz_metrics
   clickhouselogsexporter:
-    dsn: tcp://k12-clickhouse:9000/signoz_logs
+    dsn: tcp://clickhouse:9000/signoz_logs
     timeout: 10s
     use_new_schema: true
   signozclickhousemeter:
-    dsn: tcp://k12-clickhouse:9000/signoz_meter
+    dsn: tcp://clickhouse:9000/signoz_meter
     timeout: 45s
     sending_queue:
       enabled: false
   metadataexporter:
     cache:
       provider: in_memory
-    dsn: tcp://k12-clickhouse:9000/signoz_metadata
+    dsn: tcp://clickhouse:9000/signoz_metadata
     enabled: true
     timeout: 45s
 service:

@@ -4,9 +4,7 @@ package com.k12.tenant.domain.models.error;
  * Base interface for all tenant admin creation errors.
  */
 public sealed interface TenantAdminError
-        permits TenantAdminError.ValidationError,
-                TenantAdminError.ConflictError,
-                TenantAdminError.PersistenceError {
+        permits TenantAdminError.ValidationError, TenantAdminError.ConflictError, TenantAdminError.PersistenceError {
 
     /**
      * Returns the error message.

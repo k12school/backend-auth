@@ -7,6 +7,8 @@ services:
   k12-postgres:
     image: postgres:17-alpine
     container_name: k12-postgres
+    ports:
+      - "15432:5432"  # External 15432 -> Internal 5432 for jOOQ code generation
     environment:
       POSTGRES_USER: k12_user
       POSTGRES_PASSWORD: k12_password
@@ -58,7 +60,6 @@ services:
         labels: "service=k12-backend"
     networks:
       - k12-monitoring
-      - k12-signoz-net
     depends_on:
       k12-postgres:
         condition: service_healthy
@@ -73,10 +74,7 @@ services:
 networks:
   k12-monitoring:
     name: k12-monitoring
-    external: true
-  k12-signoz-net:
-    name: k12-signoz-net
-    external: true
+    external: false
 
 volumes:
   k12-backend-data:

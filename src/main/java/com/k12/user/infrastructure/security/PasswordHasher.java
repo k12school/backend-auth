@@ -1,7 +1,7 @@
 package com.k12.user.infrastructure.security;
 
-import com.k12.user.domain.models.PasswordHash;
 import at.favre.lib.crypto.bcrypt.BCrypt;
+import com.k12.user.domain.models.PasswordHash;
 
 /**
  * Utility for hashing passwords using BCrypt.
