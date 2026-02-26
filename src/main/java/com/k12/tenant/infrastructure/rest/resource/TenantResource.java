@@ -384,33 +384,36 @@ public class TenantResource {
         return switch (error) {
             case TenantAdminError.ConflictError.TENANT_NOT_FOUND ->
                 Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ErrorResponse("TENANT_NOT_FOUND", "Tenant not found"))
-                    .build();
+                        .entity(new ErrorResponse("TENANT_NOT_FOUND", "Tenant not found", 404))
+                        .build();
             case TenantAdminError.ConflictError.EMAIL_ALREADY_EXISTS ->
                 Response.status(Response.Status.CONFLICT)
-                    .entity(new ErrorResponse("EMAIL_ALREADY_EXISTS", "Email already exists"))
-                    .build();
+                        .entity(new ErrorResponse("EMAIL_ALREADY_EXISTS", "Email already exists", 409))
+                        .build();
             case TenantAdminError.ValidationError.INVALID_EMAIL ->
                 Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("INVALID_EMAIL", "Invalid email format"))
-                    .build();
+                        .entity(new ErrorResponse("INVALID_EMAIL", "Invalid email format", 400))
+                        .build();
             case TenantAdminError.ValidationError.INVALID_PASSWORD ->
                 Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("INVALID_PASSWORD", "Password must be at least 8 characters"))
-                    .build();
+                        .entity(new ErrorResponse("INVALID_PASSWORD", "Password must be at least 8 characters", 400))
+                        .build();
             case TenantAdminError.ValidationError.INVALID_NAME ->
                 Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("INVALID_NAME", "Name cannot be blank"))
-                    .build();
+                        .entity(new ErrorResponse("INVALID_NAME", "Name cannot be blank", 400))
+                        .build();
             case TenantAdminError.ValidationError.INVALID_PERMISSIONS ->
                 Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse("INVALID_PERMISSIONS", "At least one permission is required"))
-                    .build();
-            case TenantAdminError.PersistenceError.USER_CREATION_FAILED,
-                 TenantAdminError.PersistenceError.ADMIN_CREATION_FAILED ->
+                        .entity(new ErrorResponse("INVALID_PERMISSIONS", "At least one permission is required", 400))
+                        .build();
+            case TenantAdminError.PersistenceError.USER_CREATION_FAILED ->
                 Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse(error.name(), "Failed to create admin"))
-                    .build();
+                        .entity(new ErrorResponse("USER_CREATION_FAILED", "Failed to create admin", 500))
+                        .build();
+            case TenantAdminError.PersistenceError.ADMIN_CREATION_FAILED ->
+                Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                        .entity(new ErrorResponse("ADMIN_CREATION_FAILED", "Failed to create admin", 500))
+                        .build();
         };
     }
 }
