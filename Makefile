@@ -108,7 +108,7 @@ create-networks: ## Create required Docker networks
 up-all: docker-build ## Start full stack (app + monitoring)
 	@echo "$(BLUE)Starting full stack...$(NC)"
 	@echo "$(YELLOW)Removing conflicting containers if any...$(NC)"
-	@docker ps -a --filter "name=k12" --format "{{.Names}}" | grep -E "^(k12-postgres|k12-backend)$$" | xargs -r docker rm -fv 2>/dev/null || true
+	@docker ps -a --filter "name=k12" --format "{{.Names}}" | grep -E "^(k12-postgres|k12-backend|k12-redoc)$$" | xargs -r docker rm -fv 2>/dev/null || true
 	COMPOSE_PROJECT_NAME=k12 $(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILES) up -d --remove-orphans
 	@echo "$(YELLOW)Waiting for services to be healthy...$(NC)"
 	@sleep 10
