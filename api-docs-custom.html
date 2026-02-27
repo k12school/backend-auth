@@ -1239,6 +1239,7 @@
 
         populateProfileSelect() {
             const select = document.getElementById('auth-profile-select');
+            if (!select) return; // Element doesn't exist in this version
             const profiles = this.stateManager.get('auth.profiles');
             const currentProfile = this.stateManager.get('auth.currentProfile');
             select.innerHTML = Object.keys(profiles)
@@ -1335,7 +1336,15 @@
                 throw new Error('Invalid JWT format');
             }
 
-            const payload = JSON.parse(atob(parts[1]));
+            // Convert base64url to base64
+            let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+
+            // Add padding if needed
+            while (base64.length % 4) {
+                base64 += '=';
+            }
+
+            const payload = JSON.parse(atob(base64));
             return payload;
         }
 
@@ -1441,6 +1450,7 @@
 
         updateTokenStatus() {
             const statusEl = document.getElementById('token-status');
+            if (!statusEl) return; // Element doesn't exist in this version
             const profile = this.getCurrentProfile();
             if (!profile.token) {
                 statusEl.textContent = 'No token';
@@ -1668,8 +1678,15 @@
             }
 
             const token = this.authManager.getCurrentToken();
+            console.log('[DEBUG] buildHeaders:', {
+                method,
+                hasToken: !!token,
+                tokenStart: token ? token.substring(0, 30) + '...' : null,
+                existingAuth: result['Authorization']
+            });
             if (token && !result['Authorization']) {
                 result['Authorization'] = `Bearer ${token}`;
+                console.log('[DEBUG] Authorization header added');
             }
             return result;
         }
@@ -1728,6 +1745,22 @@
                     size,
                     timestamp: new Date().toISOString()
                 });
+
+                // Auto-extract JWT token from successful responses
+                console.log('[DEBUG] Token extraction check:', {
+                    ok: response.ok,
+                    status: response.status,
+                    bodyType: typeof responseBody,
+                    hasToken: responseBody && typeof responseBody === 'object' && 'token' in responseBody,
+                    tokenValue: responseBody?.token?.substring(0, 20) + '...'
+                });
+                if (response.ok && typeof responseBody === 'object' && responseBody !== null && responseBody.token) {
+                    console.log('[DEBUG] Extracting token...');
+                    this.authManager.setToken(responseBody.token);
+                    this.eventBus.emit('ui:notification', {
+                        message: '✅ Token automatically extracted and stored'
+                    });
+                }
 
                 this.eventBus.emit('request:complete', {
                     method,
@@ -1854,9 +1887,12 @@
                 this.openHelpModal();
             });
 
-            document.getElementById('auth-profile-select').addEventListener('change', (e) => {
-                this.eventBus.emit('auth:profile:changed', { profile: e.target.value });
-            });
+            const authProfileSelect = document.getElementById('auth-profile-select');
+            if (authProfileSelect) {
+                authProfileSelect.addEventListener('change', (e) => {
+                    this.eventBus.emit('auth:profile:changed', { profile: e.target.value });
+                });
+            }
 
             document.getElementById('request-method').addEventListener('change', (e) => {
                 const method = e.target.value;
@@ -1872,6 +1908,10 @@
 
             document.getElementById('request-url').addEventListener('input', (e) => {
                 this.stateManager.set('request.url', e.target.value);
+            });
+
+            document.getElementById('request-body').addEventListener('input', (e) => {
+                this.stateManager.set('request.body', e.target.value);
             });
 
             document.getElementById('mobile-toggle').addEventListener('click', () => {
@@ -2217,6 +2257,10 @@
 
         showWarning(message) {
             const warningEl = document.getElementById('token-warning');
+            if (!warningEl) {
+                console.warn('token-warning element not found');
+                return;
+            }
             warningEl.textContent = '⚠️ ' + message;
             warningEl.classList.remove('hidden');
             setTimeout(() => warningEl.classList.add('hidden'), 5000);
