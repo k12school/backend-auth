@@ -905,6 +905,17 @@
                         </div>
                     </div>
 
+                    <!-- Path Parameters -->
+                    <div class="mb-4" id="path-params-container" style="display: none;">
+                        <div class="section-title" onclick="app.uiManager.toggleSection('path-params')">
+                            <span>Path Parameters</span>
+                            <span>▼</span>
+                        </div>
+                        <div id="path-params-section" class="section-content">
+                            <div id="path-params"></div>
+                        </div>
+                    </div>
+
                     <!-- Query Parameters -->
                     <div class="mb-4">
                         <div class="section-title" onclick="app.uiManager.toggleSection('query')">
@@ -1144,6 +1155,7 @@
                 request: {
                     method: 'GET',
                     url: '/q/health',
+                    pathParams: [],
                     query: [{ key: '', value: '' }],
                     headers: [],
                     body: ''
@@ -1633,6 +1645,37 @@
             this.stateManager.set('request.query', query);
         }
 
+        updatePathParam(index, field, value) {
+            const pathParams = this.stateManager.get('request.pathParams');
+            pathParams[index][field] = value;
+            this.stateManager.set('request.pathParams', pathParams);
+            this.rebuildUrlWithPathParams();
+        }
+
+        rebuildUrlWithPathParams() {
+            const pathParams = this.stateManager.get('request.pathParams');
+            const originalUrl = this.stateManager.get('request.originalUrl');
+
+            if (!originalUrl || !pathParams || pathParams.length === 0) {
+                return;
+            }
+
+            // Replace path parameter placeholders with actual values
+            let url = originalUrl;
+            pathParams.forEach(param => {
+                const placeholder = `{${param.name}}`;
+                url = url.replace(placeholder, param.value || placeholder);
+            });
+
+            this.stateManager.set('request.url', url);
+
+            // Update the URL input field
+            const urlInput = document.getElementById('request-url');
+            if (urlInput) {
+                urlInput.value = url;
+            }
+        }
+
         addHeader() {
             const headers = this.stateManager.get('request.headers');
             headers.push({ key: '', value: '' });
@@ -1986,6 +2029,7 @@
             });
 
             this.eventBus.on('ui:render:query-params', () => this.renderQueryParams());
+            this.eventBus.on('ui:render:path-params', () => this.renderPathParams());
             this.eventBus.on('ui:render:headers', () => this.renderHeaders());
             this.eventBus.on('ui:render:history', () => this.renderHistory());
             this.eventBus.on('ui:render:favorites', () => this.renderFavorites());
@@ -2086,6 +2130,23 @@
                     <input type="text" class="kv-value" placeholder="Value" value="${param.value}"
                         onchange="app.requestManager.updateQueryParam(${index}, 'value', this.value)">
                     <button class="btn-icon kv-delete" onclick="app.requestManager.removeQueryParam(${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        renderPathParams() {
+            const container = document.getElementById('path-params');
+            const params = this.stateManager.get('request.pathParams');
+            if (!params || params.length === 0) {
+                container.innerHTML = '<div style="color: #666; font-style: italic;">No path parameters for this endpoint</div>';
+                return;
+            }
+            container.innerHTML = params.map((param, index) => `
+                <div class="kv-row">
+                    <input type="text" class="kv-key" placeholder="Parameter" value="${param.name}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                    <input type="text" class="kv-value" placeholder="Value" value="${param.value}"
+                        onchange="app.requestManager.updatePathParam(${index}, 'value', this.value)"
+                        oninput="app.requestManager.updatePathParam(${index}, 'value', this.value)">
                 </div>
             `).join('');
         }
@@ -2408,7 +2469,11 @@
 
         async fetchOpenAPISpec() {
             try {
-                const response = await fetch('/q/openapi');
+                const response = await fetch('/q/openapi', {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
                 if (!response.ok) {
                     throw new Error(`Failed to fetch OpenAPI spec: ${response.status}`);
                 }
@@ -2595,11 +2660,34 @@
                 return {};
             }
 
+            // Merge path-level and operation-level parameters
+            // Path-level parameters apply to all operations on that path
+            // Operation-level parameters override path-level ones with the same name
+            const pathParams = pathObj.parameters || [];
+            const operationParams = endpoint.parameters || [];
+
+            // Create a map to avoid duplicate parameters (operation takes precedence)
+            const paramMap = new Map();
+
+            // Add path-level parameters first
+            pathParams.forEach(param => {
+                paramMap.set(param.name, param);
+            });
+
+            // Override/add operation-level parameters
+            operationParams.forEach(param => {
+                paramMap.set(param.name, param);
+            });
+
+            const mergedParameters = Array.from(paramMap.values());
+
+            console.log(`Parameters for ${method} ${path}:`, mergedParameters);
+
             // Extract summary, description, parameters, requestBody
             return {
                 summary: endpoint.summary || '',
                 description: endpoint.description || '',
-                parameters: endpoint.parameters || [],
+                parameters: mergedParameters,
                 requestBody: endpoint.requestBody || null,
                 responses: endpoint.responses || {}
             };
@@ -2723,7 +2811,8 @@
         populateRequestBuilder(endpointInfo) {
             const { method, path, parameters, requestBody } = endpointInfo;
 
-            // Set method and URL
+            // Store original URL with placeholders for path parameters
+            this.stateManager.set('request.originalUrl', path);
             this.stateManager.set('request.method', method);
             this.stateManager.set('request.url', path);
 
@@ -2737,6 +2826,22 @@
             const urlInput = document.getElementById('request-url');
             if (urlInput) {
                 urlInput.value = path;
+            }
+
+            // Populate path parameters from spec
+            const pathParams = parameters
+                ? parameters
+                    .filter(p => p.in === 'path')
+                    .map(p => ({ name: p.name, value: p.example || '' }))
+                : [];
+
+            this.stateManager.set('request.pathParams', pathParams);
+            this.eventBus.emit('ui:render:path-params');
+
+            // Show/hide path parameters container based on whether there are any
+            const pathParamsContainer = document.getElementById('path-params-container');
+            if (pathParamsContainer) {
+                pathParamsContainer.style.display = pathParams.length > 0 ? 'block' : 'none';
             }
 
             // Populate query parameters from spec
