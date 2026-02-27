@@ -496,6 +496,135 @@
             background: var(--accent-hover);
         }
 
+        /* JWT Header Section Styles */
+        .jwt-header-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .jwt-header-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .jwt-status-indicator {
+            font-size: 16px;
+        }
+
+        .jwt-status-indicator.active {
+            color: var(--success);
+        }
+
+        .jwt-status-indicator.inactive {
+            color: var(--text-muted);
+        }
+
+        .jwt-user-display {
+            font-size: 13px;
+            color: var(--text-secondary);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .jwt-header-btn {
+            font-size: 13px;
+            padding: 6px 12px;
+            flex-shrink: 0;
+        }
+
+        .jwt-input-panel {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 8px;
+            padding: 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            z-index: 1000;
+            display: none;
+        }
+
+        .jwt-input-panel.show {
+            display: block;
+        }
+
+        .jwt-header-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 8px;
+        }
+
+        .jwt-header-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-bg);
+        }
+
+        .jwt-expanded-info {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 8px;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            z-index: 1000;
+            min-width: 300px;
+            display: none;
+        }
+
+        .jwt-expanded-info.show {
+            display: block;
+        }
+
+        .jwt-info-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .jwt-info-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 20px;
+        }
+
+        .jwt-info-value {
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        /* On smaller screens, hide the logo text */
+        @media (max-width: 1200px) {
+            .logo::after {
+                content: "API";
+            }
+            .logo {
+                font-size: 0;
+            }
+        }
+
         /* Modal */
         .modal {
             position: fixed;
@@ -694,14 +823,37 @@
         <header class="header">
             <div class="header-left">
                 <div class="logo">K12 API Docs</div>
-                <div class="auth-selector">
-                    <label for="auth-profile-select" class="text-sm text-muted">Profile:</label>
-                    <select id="auth-profile-select">
-                        <option value="default">Default</option>
-                    </select>
-                    <span id="token-status" class="text-sm text-muted"></span>
+
+                <!-- JWT Authentication in Header -->
+                <div class="jwt-header-section">
+                    <div class="jwt-header-info" id="jwt-header-info">
+                        <span class="jwt-status-indicator" id="jwt-header-status" title="Not authenticated">○</span>
+                        <span class="jwt-user-display" id="jwt-header-user">Not Authenticated</span>
+                    </div>
+                    <button class="btn btn-sm btn-primary jwt-header-btn" onclick="app.uiManager.toggleJwtInput()">
+                        <span id="jwt-header-btn-text">Set Token</span>
+                    </button>
+                    <button class="btn btn-sm btn-ghost jwt-header-clear-btn" id="jwt-clear-btn" onclick="app.authManager.clearGlobalJwt()" style="display: none;">Clear</button>
                 </div>
-                <div id="token-warning" class="hidden"></div>
+
+                <!-- JWT Input Panel (Hidden by default) -->
+                <div class="jwt-input-panel" id="jwt-input-panel">
+                    <input type="text" id="jwt-header-input" class="jwt-header-input" placeholder="Paste JWT token..." autocomplete="off">
+                    <button class="btn btn-sm btn-primary" onclick="app.authManager.setGlobalJwt()">Set</button>
+                    <button class="btn btn-sm btn-ghost" onclick="app.uiManager.toggleJwtInput()">Cancel</button>
+                </div>
+
+                <!-- Expanded JWT User Info -->
+                <div class="jwt-expanded-info" id="jwt-expanded-info">
+                    <div class="jwt-info-row">
+                        <span class="jwt-info-label">📧</span>
+                        <span class="jwt-info-value" id="jwt-email"></span>
+                    </div>
+                    <div class="jwt-info-row">
+                        <span class="jwt-info-label">👤</span>
+                        <span class="jwt-info-value" id="jwt-roles"></span>
+                    </div>
+                </div>
             </div>
             <div class="header-right">
                 <button id="theme-toggle" class="btn-icon" title="Toggle theme">🌙</button>
@@ -749,38 +901,6 @@
                                 <button class="btn btn-ghost btn-sm" onclick="app.requestManager.quickRequest('GET', '/q/openapi')">OpenAPI Spec</button>
                                 <button class="btn btn-ghost btn-sm" onclick="app.requestManager.quickLogin()">Login (Super Admin)</button>
                                 <button class="btn btn-ghost btn-sm" onclick="app.requestManager.quickLoginTenant()">Login (Tenant Admin)</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Global JWT Authentication -->
-                    <div class="mb-4">
-                        <div class="section-title" onclick="app.uiManager.toggleSection('jwt')">
-                            <span>🔐 JWT Authentication</span>
-                            <span>▼</span>
-                        </div>
-                        <div id="jwt-section" class="section-content">
-                            <div class="jwt-container">
-                                <div class="jwt-input-group">
-                                    <input type="text" id="jwt-token-input" class="jwt-input" placeholder="Paste your JWT token here..." autocomplete="off">
-                                    <button class="btn btn-primary btn-sm" onclick="app.authManager.setGlobalJwt()">Set Token</button>
-                                    <button class="btn btn-ghost btn-sm" id="jwt-clear-btn" onclick="app.authManager.clearGlobalJwt()" style="display: none;">Clear</button>
-                                </div>
-                                <div id="jwt-user-info" class="jwt-user-info hidden">
-                                    <div class="jwt-info-item">
-                                        <span class="jwt-info-label">📧 Email:</span>
-                                        <span class="jwt-info-value" id="jwt-email"></span>
-                                    </div>
-                                    <div class="jwt-info-item">
-                                        <span class="jwt-info-label">👤 Roles:</span>
-                                        <span class="jwt-info-value" id="jwt-roles"></span>
-                                    </div>
-                                    <div class="jwt-info-item">
-                                        <span class="jwt-info-label">⏰ Expires:</span>
-                                        <span class="jwt-info-value" id="jwt-expires"></span>
-                                    </div>
-                                </div>
-                                <div id="jwt-status" class="jwt-status"></div>
                             </div>
                         </div>
                     </div>
@@ -1163,7 +1283,7 @@
         }
 
         setGlobalJwt() {
-            const tokenInput = document.getElementById('jwt-token-input');
+            const tokenInput = document.getElementById('jwt-header-input');
             const token = tokenInput.value.trim();
             if (!token) {
                 alert('Please enter a JWT token');
@@ -1178,11 +1298,17 @@
                 this.setToken(token);
 
                 // Update UI
-                this.updateJwtUserInfo(payload);
-                this.updateJwtStatus(true);
+                this.updateJwtDisplay();
+
+                // Hide input panel and show expanded info briefly
+                app.uiManager.showJwtExpandedInfo();
 
                 // Clear input
                 tokenInput.value = '';
+
+                // Close the panel
+                const panel = document.getElementById('jwt-input-panel');
+                panel.classList.remove('show');
 
                 // Show success message
                 this.showToast('JWT token set successfully!', 'success');
@@ -1213,57 +1339,53 @@
             return payload;
         }
 
-        updateJwtUserInfo(payload) {
-            const email = payload.email || payload.sub || 'N/A';
-            const roles = payload.roles || payload.groups || [];
-            const exp = payload.exp;
-
-            document.getElementById('jwt-email').textContent = email;
-            document.getElementById('jwt-roles').textContent = Array.isArray(roles) ? roles.join(', ') : roles;
-
-            if (exp) {
-                const expiryDate = new Date(exp * 1000);
-                const now = new Date();
-                const isExpired = expiryDate < now;
-                document.getElementById('jwt-expires').textContent = isExpired ? 'Expired' : expiryDate.toLocaleString();
-            } else {
-                document.getElementById('jwt-expires').textContent = 'N/A';
-            }
-
-            // Show user info
-            document.getElementById('jwt-user-info').classList.remove('hidden');
-        }
-
         updateJwtDisplay() {
             const token = this.getCurrentToken();
+            const headerStatus = document.getElementById('jwt-header-status');
+            const headerUser = document.getElementById('jwt-header-user');
+            const headerBtnText = document.getElementById('jwt-header-btn-text');
             const clearBtn = document.getElementById('jwt-clear-btn');
-            const userInfo = document.getElementById('jwt-user-info');
+            const expandedInfo = document.getElementById('jwt-expanded-info');
 
             if (token) {
                 clearBtn.style.display = 'inline-block';
                 try {
                     const payload = this.parseJwt(token);
-                    this.updateJwtUserInfo(payload);
-                    this.updateJwtStatus(true);
+
+                    // Update header display
+                    const email = payload.email || payload.sub || 'N/A';
+                    headerUser.textContent = email;
+                    headerStatus.textContent = '✓';
+                    headerStatus.className = 'jwt-status-indicator active';
+                    headerBtnText.textContent = 'Update';
+
+                    // Update expanded info
+                    document.getElementById('jwt-email').textContent = email;
+                    const roles = payload.roles || payload.groups || [];
+                    document.getElementById('jwt-roles').textContent = Array.isArray(roles) ? roles.join(', ') : roles;
+
+                    if (payload.exp) {
+                        const expiryDate = new Date(payload.exp * 1000);
+                        const now = new Date();
+                        const isExpired = expiryDate < now;
+                        document.getElementById('jwt-expires').textContent = isExpired ? 'Expired' : expiryDate.toLocaleString();
+                    } else {
+                        document.getElementById('jwt-expires').textContent = 'N/A';
+                    }
+
                 } catch (e) {
-                    userInfo.classList.add('hidden');
-                    this.updateJwtStatus(false);
+                    headerUser.textContent = 'Invalid Token';
+                    headerStatus.textContent = '⚠';
+                    headerStatus.className = 'jwt-status-indicator';
+                    headerBtnText.textContent = 'Set Token';
                 }
             } else {
                 clearBtn.style.display = 'none';
-                userInfo.classList.add('hidden');
-                this.updateJwtStatus(false);
-            }
-        }
-
-        updateJwtStatus(isActive) {
-            const status = document.getElementById('jwt-status');
-            if (isActive) {
-                status.textContent = '✓ Active';
-                status.className = 'jwt-status active';
-            } else {
-                status.textContent = '○ Not Set';
-                status.className = 'jwt-status inactive';
+                headerUser.textContent = 'Not Authenticated';
+                headerStatus.textContent = '○';
+                headerStatus.className = 'jwt-status-indicator inactive';
+                headerBtnText.textContent = 'Set Token';
+                expandedInfo.classList.remove('show');
             }
         }
 
@@ -1855,6 +1977,36 @@
             const section = document.getElementById(`${sectionId}-section`);
             section.classList.toggle('collapsed');
             this.saveToStorage();
+        }
+
+        toggleJwtInput() {
+            const panel = document.getElementById('jwt-input-panel');
+            const expandedInfo = document.getElementById('jwt-expanded-info');
+
+            // Toggle input panel
+            panel.classList.toggle('show');
+
+            // If panel is being shown, focus the input
+            if (panel.classList.contains('show')) {
+                setTimeout(() => {
+                    document.getElementById('jwt-header-input').focus();
+                }, 100);
+            }
+
+            // Close expanded info if open
+            expandedInfo.classList.remove('show');
+        }
+
+        showJwtExpandedInfo() {
+            const expandedInfo = document.getElementById('jwt-expanded-info');
+            const inputPanel = document.getElementById('jwt-input-panel');
+            expandedInfo.classList.add('show');
+            inputPanel.classList.remove('show');
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                expandedInfo.classList.remove('show');
+            }, 5000);
         }
 
         toggleDarkMode() {

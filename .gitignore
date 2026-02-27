@@ -45,3 +45,4 @@ log/
 ### Mac OS ###
 .DS_Store
 .env
+.aider*

@@ -38,7 +38,7 @@ BEGIN
         v_user_id,
         'admin@k12.com',
         '$2y$10$w1vuFZtUrAhZ8WjsVBxU/.51EtfYhG8KX7Vd2jUbFe/l79LWV9eAm', -- admin123
-        'ADMIN',
+        'SUPER_ADMIN',
         'ACTIVE',
         'Super Admin',
         v_now,
@@ -47,6 +47,7 @@ BEGIN
     ON CONFLICT (email) DO NOTHING;
 
     -- Insert admin profile with all permissions
+    /*
     INSERT INTO admins (user_id, permissions, status, created_at, updated_at)
     VALUES (
         v_user_id,
@@ -56,6 +57,7 @@ BEGIN
         v_now
     )
     ON CONFLICT (user_id) DO NOTHING;
+     */
 
     RAISE NOTICE 'Super admin created successfully. Email: admin@k12.com, Password: admin123';
 END $$;
