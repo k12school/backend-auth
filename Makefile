@@ -1,4 +1,4 @@
-.PHONY: help build clean test docker-build docker-up docker-down docker-logs docker-ps check-networks create-networks up-all down-all restart db-shell db-restore health db-up generate-jooq
+.PHONY: help build clean test docker-build docker-up docker-down docker-logs docker-ps check-networks create-networks up-all down-all restart-all clean-all db-shell db-restore health db-up generate-jooq
 
 # Default target
 .DEFAULT_GOAL := help
@@ -107,7 +107,9 @@ create-networks: ## Create required Docker networks
 
 up-all: docker-build ## Start full stack (app + monitoring)
 	@echo "$(BLUE)Starting full stack...$(NC)"
-	COMPOSE_PROJECT_NAME=k12 $(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILES) up -d
+	@echo "$(YELLOW)Removing conflicting containers if any...$(NC)"
+	@docker ps -a --filter "name=k12" --format "{{.Names}}" | grep -E "^(k12-postgres|k12-backend)$$" | xargs -r docker rm -fv 2>/dev/null || true
+	COMPOSE_PROJECT_NAME=k12 $(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILES) up -d --remove-orphans
 	@echo "$(YELLOW)Waiting for services to be healthy...$(NC)"
 	@sleep 10
 	@echo "$(GREEN)Full stack started!$(NC)"
@@ -131,6 +133,13 @@ down-all: ## Stop full stack
 	@echo "$(GREEN)Full stack stopped!$(NC)"
 
 restart-all: down-all up-all ## Restart full stack
+
+clean-all: ## Remove all containers, volumes, and images for fresh start
+	@echo "$(BLUE)Removing all containers, volumes, and images...$(NC)"
+	COMPOSE_PROJECT_NAME=k12 $(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILES) down -v --remove-orphans
+	@echo "$(YELLOW)Removing k12-monitoring network if unused...$(NC)"
+	@docker network ls -q --filter "name=k12-monitoring" | xargs -r docker network rm 2>/dev/null || true
+	@echo "$(GREEN)Cleanup complete!$(NC)"
 
 ##@ Database
 
