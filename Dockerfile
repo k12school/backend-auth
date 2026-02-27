@@ -21,6 +21,9 @@ COPY --from=build /app/quarkus-app ./quarkus-app
 # Copy OpenTelemetry Java Agent
 COPY monitoring/opentelemetry/opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
 
+# Copy JWT keys
+COPY src/main/resources/keys /app/keys/
+
 # Expose the HTTP port
 EXPOSE 8080
 

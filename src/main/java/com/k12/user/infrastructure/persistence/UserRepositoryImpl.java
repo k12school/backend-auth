@@ -7,16 +7,23 @@ import com.k12.backend.infrastructure.jooq.public_.tables.records.UserEventsReco
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.UserId;
 import com.k12.tenant.infrastructure.persistence.KryoEventSerializer;
+import com.k12.user.domain.models.EmailAddress;
+import com.k12.user.domain.models.PasswordHash;
 import com.k12.user.domain.models.User;
+import com.k12.user.domain.models.UserName;
 import com.k12.user.domain.models.UserReconstructor;
+import com.k12.user.domain.models.UserRole;
+import com.k12.user.domain.models.UserStatus;
 import com.k12.user.domain.models.error.UserError;
 import com.k12.user.domain.models.events.UserEvents;
 import com.k12.user.domain.ports.out.UserRepository;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
@@ -41,15 +48,60 @@ public class UserRepositoryImpl implements UserRepository {
     public Optional<User> findById(UserId userId) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
         try {
+            // First try to load from events
             List<UserEvents> events = loadEvents(ctx, userId.value());
             if (events.isEmpty()) {
-                return Optional.empty();
+                // Fallback: load from projection table for users created via migrations
+                return findByProjection(ctx, userId.value());
             }
             Result<User, UserError> result = UserReconstructor.reconstructWithValidation(events);
             return result.isSuccess() ? Optional.of(result.get()) : Optional.empty();
         } catch (Exception e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Loads user directly from projection table.
+     * Used as fallback for users created via database migrations.
+     */
+    private Optional<User> findByProjection(DSLContext ctx, UUID userId) {
+        var record = ctx.selectFrom(USERS).where(USERS.ID.eq(userId)).fetchOne();
+
+        if (record == null) {
+            return Optional.empty();
+        }
+
+        try {
+            User user = new User(
+                    new UserId(record.getId()),
+                    EmailAddress.of(record.getEmail()),
+                    new PasswordHash(record.getPasswordHash()),
+                    parseRoles(record.getRoles()),
+                    UserStatus.valueOf(record.getStatus()),
+                    UserName.of(record.getName()));
+            return Optional.of(user);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Parses roles string into Set<UserRole>.
+     */
+    private Set<UserRole> parseRoles(String rolesString) {
+        Set<UserRole> roles = new HashSet<>();
+        if (rolesString != null && !rolesString.isEmpty()) {
+            String[] parts = rolesString.split(",");
+            for (String part : parts) {
+                try {
+                    roles.add(UserRole.valueOf(part.trim()));
+                } catch (IllegalArgumentException e) {
+                    // Skip invalid roles
+                }
+            }
+        }
+        return roles;
     }
 
     @Override

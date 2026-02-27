@@ -58,8 +58,8 @@ public class TokenService {
 
     private static PrivateKey getPrivateKey() {
         try {
-            String keyContent = new String(
-                    Files.readAllBytes(Paths.get("src/main/resources/keys/private-key.pem")), StandardCharsets.UTF_8);
+            String keyPath = System.getenv().getOrDefault("JWT_KEY_PATH", "/app/keys/private-key.pem");
+            String keyContent = new String(Files.readAllBytes(Paths.get(keyPath)), StandardCharsets.UTF_8);
             keyContent = keyContent
                     .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
