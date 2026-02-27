@@ -69,6 +69,19 @@ services:
       retries: 5
       start_period: 30s
 
+  k12-redoc:
+    build:
+      context: .
+      dockerfile: redoc-custom.Dockerfile
+    container_name: k12-redoc
+    ports:
+      - "8082:80"  # Redoc UI
+    networks:
+      - k12-monitoring
+    depends_on:
+      - k12-backend
+    restart: unless-stopped
+
 networks:
   k12-monitoring:
     name: k12-monitoring

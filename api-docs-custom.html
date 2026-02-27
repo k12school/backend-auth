@@ -1,0 +1,2457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K12 API Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/redoc@latest/bundles/redoc.standalone.js"></script>
+    <style>
+        :root {
+            /* Light Theme */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-tertiary: #e8e8e8;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-muted: #999999;
+            --border-color: #ddd;
+            --accent-primary: #3f51b5;
+            --accent-hover: #303f9f;
+            --accent-bg: rgba(63, 81, 181, 0.1);
+            --success: #4caf50;
+            --warning: #ff9800;
+            --error: #f44336;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --card-shadow: 0 2px 8px var(--shadow);
+            --transition: 0.2s ease;
+        }
+
+        [data-theme="dark"] {
+            /* Dark Theme */
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --border-color: #444;
+            --accent-primary: #5c6bc0;
+            --accent-hover: #7986cb;
+            --accent-bg: rgba(92, 107, 192, 0.15);
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background var(--transition), color var(--transition);
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            gap: 16px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: var(--accent-primary);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 18px;
+            transition: background var(--transition);
+        }
+
+        .btn-icon:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Redoc Container */
+        #redoc {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--bg-primary);
+        }
+
+        /* Try It Panel */
+        .try-panel {
+            width: 500px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .request-bar {
+            display: flex;
+            gap: 8px;
+        }
+
+        #request-method {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        #request-url {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .section-title:hover {
+            color: var(--text-primary);
+        }
+
+        .section-content {
+            margin-bottom: 16px;
+        }
+
+        .kv-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .kv-key, .kv-value {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .kv-delete {
+            width: 28px;
+            height: 28px;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            resize: vertical;
+        }
+
+        textarea:focus, input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        /* Response Section */
+        #response-section {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .response-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .response-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-2xx {
+            background: var(--success);
+            color: white;
+        }
+
+        .status-4xx {
+            background: var(--warning);
+            color: white;
+        }
+
+        .status-5xx {
+            background: var(--error);
+            color: white;
+        }
+
+        .method-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .method-GET { background: #61affe; color: white; }
+        .method-POST { background: #49cc90; color: white; }
+        .method-PUT { background: #fca130; color: white; }
+        .method-PATCH { background: #50e3c2; color: white; }
+        .method-DELETE { background: #f93e3e; color: white; }
+
+        #response-body {
+            background: var(--bg-tertiary);
+            padding: 16px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* JSON Syntax Highlighting */
+        .json-key { color: #0066cc; }
+        .json-string { color: #228b22; }
+        .json-number { color: #b22222; }
+        .json-boolean { color: #bc8f8f; }
+        .json-null { color: #808080; }
+
+        [data-theme="dark"] .json-key { color: #9cdcfe; }
+        [data-theme="dark"] .json-string { color: #ce9178; }
+        [data-theme="dark"] .json-number { color: #b5cea8; }
+        [data-theme="dark"] .json-boolean { color: #569cd6; }
+        [data-theme="dark"] .json-null { color: #569cd6; }
+
+        /* History & Favorites */
+        .history-item, .favorite-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background var(--transition);
+        }
+
+        .history-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .gap-2 {
+            gap: 8px;
+        }
+
+        .text-sm {
+            font-size: 13px;
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+        }
+
+        /* Auth Profile Selector */
+        .auth-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .auth-selector select {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 24px;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .help-section {
+            margin-bottom: 16px;
+        }
+
+        .help-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--accent-primary);
+        }
+
+        .help-section p, .help-section ul {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .help-section ul {
+            padding-left: 20px;
+        }
+
+        .help-section li {
+            margin-bottom: 4px;
+        }
+
+        kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Token Warning */
+        #token-warning {
+            padding: 8px 12px;
+            background: var(--warning);
+            color: white;
+            font-size: 13px;
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1024px) {
+            .try-panel {
+                position: fixed;
+                right: 0;
+                top: 0;
+                bottom: 0;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                z-index: 100;
+            }
+
+            .try-panel.active {
+                transform: translateX(0);
+            }
+
+            #mobile-toggle {
+                display: flex !important;
+            }
+        }
+
+        #mobile-toggle {
+            display: none;
+        }
+
+        /* Spinners */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Try in Panel Button */
+        .try-in-panel-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            margin-left: 8px;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .try-in-panel-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .try-in-panel-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Endpoint Highlighting */
+        .endpoint-active {
+            background: var(--accent-bg) !important;
+            border-left: 3px solid var(--accent-primary) !important;
+        }
+
+        .endpoint-highlight-fade {
+            animation: highlightFade 2s ease-out;
+        }
+
+        @keyframes highlightFade {
+            0% { background: var(--accent-bg); }
+            100% { background: transparent; }
+        }
+
+        /* Utility classes */
+        .mb-2 { margin-bottom: 8px; }
+        .mb-4 { margin-bottom: 16px; }
+        .mt-4 { margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">K12 API Docs</div>
+                <div class="auth-selector">
+                    <label for="auth-profile-select" class="text-sm text-muted">Profile:</label>
+                    <select id="auth-profile-select">
+                        <option value="default">Default</option>
+                    </select>
+                    <span id="token-status" class="text-sm text-muted"></span>
+                </div>
+                <div id="token-warning" class="hidden"></div>
+            </div>
+            <div class="header-right">
+                <button id="theme-toggle" class="btn-icon" title="Toggle theme">🌙</button>
+                <button id="help-toggle" class="btn-icon" title="Help">?</button>
+                <button id="mobile-toggle" class="btn">Try It Panel</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Redoc Documentation -->
+            <div id="redoc"></div>
+
+            <!-- Try It Panel -->
+            <div id="try-panel" class="try-panel">
+                <div class="panel-header">
+                    <div class="panel-title">Try It Out</div>
+                    <div class="request-bar">
+                        <select id="request-method">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="PATCH">PATCH</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                        <input type="text" id="request-url" placeholder="/endpoint" value="/q/health">
+                        <button id="send-btn" class="btn">
+                            <span id="send-icon">▶</span>
+                            <span id="send-text">Send</span>
+                            <span id="send-spinner" class="spinner hidden"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-content">
+                    <!-- Quick Actions -->
+                    <div class="mb-4">
+                        <div class="section-title" onclick="app.uiManager.toggleSection('quick')">
+                            <span>Quick Actions</span>
+                            <span>▼</span>
+                        </div>
+                        <div id="quick-section" class="section-content">
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button class="btn btn-ghost btn-sm" onclick="app.requestManager.quickRequest('GET', '/q/health')">Health Check</button>
+                                <button class="btn btn-ghost btn-sm" onclick="app.requestManager.quickRequest('GET', '/q/openapi')">OpenAPI Spec</button>
+                                <button class="btn btn-ghost btn-sm" onclick="app.requestManager.quickLogin()">Login (Super Admin)</button>
+                                <button class="btn btn-ghost btn-sm" onclick="app.requestManager.quickLoginTenant()">Login (Tenant Admin)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Query Parameters -->
+                    <div class="mb-4">
+                        <div class="section-title" onclick="app.uiManager.toggleSection('query')">
+                            <span>Query Parameters</span>
+                            <span>▼</span>
+                        </div>
+                        <div id="query-section" class="section-content">
+                            <div id="query-params"></div>
+                            <button class="btn btn-ghost btn-sm mt-4" onclick="app.requestManager.addQueryParam()">+ Add Parameter</button>
+                        </div>
+                    </div>
+
+                    <!-- Headers -->
+                    <div class="mb-4">
+                        <div class="section-title" onclick="app.uiManager.toggleSection('headers')">
+                            <span>Headers</span>
+                            <span>▼</span>
+                        </div>
+                        <div id="headers-section" class="section-content">
+                            <div id="headers"></div>
+                            <button class="btn btn-ghost btn-sm mt-4" onclick="app.requestManager.addHeader()">+ Add Header</button>
+                        </div>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="mb-2">
+                        <div class="section-title" onclick="app.uiManager.toggleSection('body')">
+                            <span>Request Body</span>
+                            <span>▼</span>
+                        </div>
+                        <div id="body-section" class="section-content">
+                            <textarea id="request-body" placeholder='{"key": "value"}'></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Response -->
+                    <div id="response-section" class="hidden">
+                        <div class="response-header">
+                            <span id="status-badge" class="status-badge"></span>
+                            <div class="response-meta">
+                                <span id="response-time"></span>
+                                <span>|</span>
+                                <span id="response-size"></span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-ghost btn-sm" onclick="app.requestManager.copyResponse()">Copy</button>
+                                <button class="btn btn-ghost btn-sm" onclick="app.requestManager.downloadResponse()">Download</button>
+                            </div>
+                        </div>
+                        <div id="response-body"></div>
+                    </div>
+
+                    <!-- History -->
+                    <div class="mb-4 mt-4">
+                        <div class="section-title" onclick="app.uiManager.toggleSection('history')">
+                            <span>History (<span id="history-count">0</span>)</span>
+                            <div class="flex gap-2">
+                                <button class="btn btn-ghost btn-sm" onclick="app.historyManager.clearHistory()">Clear</button>
+                                <span>▼</span>
+                            </div>
+                        </div>
+                        <div id="history-section" class="section-content">
+                            <div id="history-list"></div>
+                        </div>
+                    </div>
+
+                    <!-- Favorites -->
+                    <div class="mb-4">
+                        <div class="section-title" onclick="app.uiManager.toggleSection('favorites')">
+                            <span>Favorites (<span id="favorites-count">0</span>)</span>
+                            <div class="flex gap-2">
+                                <button class="btn btn-ghost btn-sm" onclick="app.uiManager.exportFavorites()">Export</button>
+                                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-favorites-input').click()">Import</button>
+                                <input type="file" id="import-favorites-input" accept=".json" style="display:none" onchange="app.uiManager.importFavorites(this)">
+                                <span>▼</span>
+                            </div>
+                        </div>
+                        <div id="favorites-section" class="section-content">
+                            <div id="favorites-list"></div>
+                            <button class="btn btn-ghost btn-sm mt-4" onclick="app.uiManager.saveAsFavorite()">+ Save Current as Favorite</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Keyboard Shortcuts & Help</h2>
+                <button class="modal-close" onclick="app.uiManager.closeModal()">×</button>
+            </div>
+            <div class="help-section">
+                <h3>Keyboard Shortcuts</h3>
+                <ul>
+                    <li><kbd>Ctrl</kbd> + <kbd>Enter</kbd> - Send request</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>K</kbd> - Focus URL input</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>H</kbd> - Toggle history panel</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>F</kbd> - Toggle favorites panel</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>D</kbd> - Toggle dark mode</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>N</kbd> - New request</li>
+                    <li><kbd>Esc</kbd> - Close modal</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>Features</h3>
+                <ul>
+                    <li>Click any endpoint in the documentation to auto-fill the request</li>
+                    <li>Save frequently used requests as favorites</li>
+                    <li>View your request history and replay any request</li>
+                    <li>Configure multiple auth profiles for different environments</li>
+                    <li>Import/export favorites for backup or sharing</li>
+                    <li>Dark mode support for comfortable viewing</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>Auth Profiles</h3>
+                <p>Configure authentication profiles in the settings. Each profile can have its own base URL and access token. The token will be automatically included in all requests.</p>
+            </div>
+            <div class="help-section">
+                <h3>🔗 Redoc Integration</h3>
+                <ul>
+                    <li><strong>Click endpoint in docs:</strong> Click any endpoint in Redoc (left panel) to auto-populate the request builder</li>
+                    <li><strong>🚀 Try in Panel button:</strong> Quick-load buttons appear next to each endpoint for fast access</li>
+                    <li><strong>Visual feedback:</strong> Selected endpoint highlights with colored background for 2 seconds</li>
+                    <li><strong>Example bodies:</strong> Request body examples are auto-generated from OpenAPI schemas</li>
+                    <li><strong>Query parameters:</strong> Parameters from the OpenAPI spec are automatically filled in</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ============================================
+    // UTILITIES
+    // ============================================
+
+    /**
+     * EventEmitter - Simple pub/sub event system
+     */
+    class EventEmitter {
+        constructor() {
+            this.events = {};
+        }
+
+        on(event, listener) {
+            if (!this.events[event]) {
+                this.events[event] = [];
+            }
+            this.events[event].push(listener);
+            return () => this.off(event, listener);
+        }
+
+        off(event, listenerToRemove) {
+            if (!this.events[event]) return;
+            this.events[event] = this.events[event].filter(listener => listener !== listenerToRemove);
+        }
+
+        emit(event, data) {
+            if (!this.events[event]) return;
+            this.events[event].forEach(listener => listener(data));
+        }
+
+        once(event, listener) {
+            const wrappedListener = (data) => {
+                listener(data);
+                this.off(event, wrappedListener);
+            };
+            this.on(event, wrappedListener);
+        }
+    }
+
+    /**
+     * StorageManager - LocalStorage wrapper with error handling
+     */
+    class StorageManager {
+        constructor(prefix = 'k12-redoc-') {
+            this.prefix = prefix;
+        }
+
+        get(key, defaultValue = null) {
+            try {
+                const item = localStorage.getItem(this.prefix + key);
+                return item ? JSON.parse(item) : defaultValue;
+            } catch (error) {
+                console.warn(`Storage get error for key "${key}":`, error);
+                return defaultValue;
+            }
+        }
+
+        set(key, value) {
+            try {
+                localStorage.setItem(this.prefix + key, JSON.stringify(value));
+                return true;
+            } catch (error) {
+                console.warn(`Storage set error for key "${key}":`, error);
+                return false;
+            }
+        }
+
+        remove(key) {
+            try {
+                localStorage.removeItem(this.prefix + key);
+                return true;
+            } catch (error) {
+                console.warn(`Storage remove error for key "${key}":`, error);
+                return false;
+            }
+        }
+
+        clear() {
+            try {
+                Object.keys(localStorage)
+                    .filter(key => key.startsWith(this.prefix))
+                    .forEach(key => localStorage.removeItem(key));
+                return true;
+            } catch (error) {
+                console.warn('Storage clear error:', error);
+                return false;
+            }
+        }
+    }
+
+    // ============================================
+    // STATE MANAGEMENT
+    // ============================================
+
+    /**
+     * StateManager - Centralized application state with notifications
+     */
+    class StateManager {
+        constructor(eventBus) {
+            this.eventBus = eventBus;
+            this.state = {
+                request: {
+                    method: 'GET',
+                    url: '/q/health',
+                    query: [{ key: '', value: '' }],
+                    headers: [],
+                    body: ''
+                },
+                response: null,
+                history: [],
+                favorites: [],
+                auth: {
+                    profiles: {
+                        default: {
+                            name: 'Default',
+                            baseUrl: window.location.origin,
+                            token: '',
+                            tokenExpiry: null
+                        }
+                    },
+                    currentProfile: 'default'
+                },
+                ui: {
+                    darkMode: false,
+                    collapsedSections: [],
+                    responseView: 'pretty'
+                }
+            };
+        }
+
+        get(path) {
+            const keys = path.split('.');
+            let value = this.state;
+            for (const key of keys) {
+                if (value && typeof value === 'object') {
+                    value = value[key];
+                } else {
+                    return undefined;
+                }
+            }
+            return value;
+        }
+
+        set(path, value) {
+            const keys = path.split('.');
+            const lastKey = keys.pop();
+            let target = this.state;
+            for (const key of keys) {
+                if (!(key in target) || typeof target[key] !== 'object') {
+                    target[key] = {};
+                }
+                target = target[key];
+            }
+            const oldValue = target[lastKey];
+            target[lastKey] = value;
+            this.eventBus.emit('state:changed', { path, value, oldValue });
+        }
+
+        update(path, updater) {
+            const currentValue = this.get(path);
+            const newValue = updater(currentValue);
+            this.set(path, newValue);
+            return newValue;
+        }
+    }
+
+    // ============================================
+    // CORE MODULES
+    // ============================================
+
+    /**
+     * AuthManager - Authentication and profile management
+     */
+    class AuthManager {
+        constructor(stateManager, storageManager, eventBus) {
+            this.stateManager = stateManager;
+            this.storage = storageManager;
+            this.eventBus = eventBus;
+
+            this.loadFromStorage();
+            this.startTokenMonitor();
+        }
+
+        loadFromStorage() {
+            const profiles = this.storage.get('auth:profiles', this.stateManager.get('auth.profiles'));
+            const currentProfile = this.storage.get('auth:currentProfile', 'default');
+            this.stateManager.set('auth.profiles', profiles);
+            this.stateManager.set('auth.currentProfile', currentProfile);
+            this.populateProfileSelect();
+        }
+
+        saveToStorage() {
+            this.storage.set('auth:profiles', this.stateManager.get('auth.profiles'));
+            this.storage.set('auth:currentProfile', this.stateManager.get('auth.currentProfile'));
+        }
+
+        populateProfileSelect() {
+            const select = document.getElementById('auth-profile-select');
+            const profiles = this.stateManager.get('auth.profiles');
+            const currentProfile = this.stateManager.get('auth.currentProfile');
+            select.innerHTML = Object.keys(profiles)
+                .map(key => `<option value="${key}" ${key === currentProfile ? 'selected' : ''}>${profiles[key].name}</option>`)
+                .join('');
+        }
+
+        getCurrentProfile() {
+            const currentProfile = this.stateManager.get('auth.currentProfile');
+            const profiles = this.stateManager.get('auth.profiles');
+            return profiles[currentProfile];
+        }
+
+        getCurrentBaseUrl() {
+            return this.getCurrentProfile().baseUrl;
+        }
+
+        getCurrentToken() {
+            return this.getCurrentProfile().token;
+        }
+
+        setBaseUrl(baseUrl) {
+            const currentProfile = this.stateManager.get('auth.currentProfile');
+            const profiles = this.stateManager.get('auth.profiles');
+            profiles[currentProfile].baseUrl = baseUrl;
+            this.stateManager.set('auth.profiles', profiles);
+            this.saveToStorage();
+        }
+
+        setToken(token, expiresIn) {
+            const currentProfile = this.stateManager.get('auth.currentProfile');
+            const profiles = this.stateManager.get('auth.profiles');
+            profiles[currentProfile].token = token;
+            if (expiresIn) {
+                const expiry = new Date(Date.now() + expiresIn * 1000);
+                profiles[currentProfile].tokenExpiry = expiry.toISOString();
+            }
+            this.stateManager.set('auth.profiles', profiles);
+            this.saveToStorage();
+            this.updateTokenStatus();
+        }
+
+        switchProfile(profileKey) {
+            this.stateManager.set('auth.currentProfile', profileKey);
+            this.saveToStorage();
+            this.updateTokenStatus();
+        }
+
+        createProfile(name, baseUrl, token) {
+            const profiles = this.stateManager.get('auth.profiles');
+            const key = name.toLowerCase().replace(/\s+/g, '-');
+            profiles[key] = { name, baseUrl, token, tokenExpiry: null };
+            this.stateManager.set('auth.profiles', profiles);
+            this.saveToStorage();
+            this.populateProfileSelect();
+            this.switchProfile(key);
+        }
+
+        deleteProfile(key) {
+            if (key === 'default') {
+                throw new Error('Cannot delete default profile');
+            }
+            const profiles = this.stateManager.get('auth.profiles');
+            delete profiles[key];
+            this.stateManager.set('auth.profiles', profiles);
+            this.saveToStorage();
+            this.populateProfileSelect();
+            if (this.stateManager.get('auth.currentProfile') === key) {
+                this.switchProfile('default');
+            }
+        }
+
+        updateTokenStatus() {
+            const statusEl = document.getElementById('token-status');
+            const profile = this.getCurrentProfile();
+            if (!profile.token) {
+                statusEl.textContent = 'No token';
+                return;
+            }
+            if (!profile.tokenExpiry) {
+                statusEl.textContent = 'Token set';
+                return;
+            }
+            const expiry = new Date(profile.tokenExpiry);
+            const now = new Date();
+            const minutesLeft = Math.floor((expiry - now) / 60000);
+            if (minutesLeft <= 0) {
+                statusEl.textContent = 'Expired';
+                this.eventBus.emit('auth:token:expired', { profile: this.stateManager.get('auth.currentProfile') });
+            } else if (minutesLeft <= 5) {
+                statusEl.textContent = `Expires in ${minutesLeft}m`;
+                this.eventBus.emit('auth:token:expiring', { minutesLeft });
+            } else {
+                statusEl.textContent = `Valid for ${minutesLeft}m`;
+            }
+        }
+
+        startTokenMonitor() {
+            setInterval(() => this.updateTokenStatus(), 60000);
+            this.updateTokenStatus();
+        }
+    }
+
+    /**
+     * HistoryManager - Request history and favorites
+     */
+    class HistoryManager {
+        constructor(stateManager, storageManager, eventBus) {
+            this.stateManager = stateManager;
+            this.storage = storageManager;
+            this.eventBus = eventBus;
+            this.maxHistory = 10;
+
+            this.loadFromStorage();
+            this.eventBus.on('request:complete', (data) => this.addToHistory(data));
+        }
+
+        loadFromStorage() {
+            const history = this.storage.get('history', []);
+            const favorites = this.storage.get('favorites', []);
+            this.stateManager.set('history', history);
+            this.stateManager.set('favorites', favorites);
+        }
+
+        saveToStorage() {
+            this.storage.set('history', this.stateManager.get('history'));
+            this.storage.set('favorites', this.stateManager.get('favorites'));
+        }
+
+        addToHistory(requestData) {
+            const history = this.stateManager.get('history');
+            const entry = {
+                id: Date.now(),
+                method: requestData.method,
+                url: requestData.url,
+                status: requestData.status,
+                time: requestData.time,
+                size: requestData.size,
+                timestamp: new Date().toISOString()
+            };
+            history.unshift(entry);
+            const trimmed = history.slice(0, this.maxHistory);
+            this.stateManager.set('history', trimmed);
+            this.saveToStorage();
+            this.eventBus.emit('history:added', entry);
+        }
+
+        addFavorite(name, requestData) {
+            const favorites = this.stateManager.get('favorites');
+            const entry = {
+                id: Date.now(),
+                name,
+                method: requestData.method,
+                url: requestData.url,
+                query: requestData.query,
+                headers: requestData.headers,
+                body: requestData.body,
+                timestamp: new Date().toISOString()
+            };
+            favorites.push(entry);
+            this.stateManager.set('favorites', favorites);
+            this.saveToStorage();
+            this.eventBus.emit('favorite:added', entry);
+        }
+
+        removeFavorite(id) {
+            const favorites = this.stateManager.get('favorites');
+            const filtered = favorites.filter(f => f.id !== id);
+            this.stateManager.set('favorites', filtered);
+            this.saveToStorage();
+            this.eventBus.emit('favorite:removed', { id });
+        }
+
+        clearHistory() {
+            this.stateManager.set('history', []);
+            this.saveToStorage();
+            this.eventBus.emit('history:cleared');
+        }
+
+        exportFavorites() {
+            const favorites = this.stateManager.get('favorites');
+            const blob = new Blob([JSON.stringify(favorites, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `k12-redoc-favorites-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        importFavorites(jsonString) {
+            try {
+                const favorites = JSON.parse(jsonString);
+                if (!Array.isArray(favorites)) throw new Error('Invalid format');
+                this.stateManager.set('favorites', favorites);
+                this.saveToStorage();
+                this.eventBus.emit('favorites:imported', { count: favorites.length });
+                return { success: true, count: favorites.length };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        replayHistory(id) {
+            const history = this.stateManager.get('history');
+            const entry = history.find(h => h.id === id);
+            if (entry) {
+                this.eventBus.emit('history:replay', entry);
+            }
+        }
+
+        replayFavorite(id) {
+            const favorites = this.stateManager.get('favorites');
+            const entry = favorites.find(f => f.id === id);
+            if (entry) {
+                this.eventBus.emit('favorite:replay', entry);
+            }
+        }
+    }
+
+    /**
+     * RequestManager - HTTP request execution
+     */
+    class RequestManager {
+        constructor(stateManager, authManager, eventBus) {
+            this.stateManager = stateManager;
+            this.authManager = authManager;
+            this.eventBus = eventBus;
+        }
+
+        quickRequest(method, url) {
+            this.stateManager.set('request.method', method);
+            this.stateManager.set('request.url', url);
+            this.sendRequest();
+        }
+
+        addQueryParam() {
+            const query = this.stateManager.get('request.query');
+            query.push({ key: '', value: '' });
+            this.stateManager.set('request.query', query);
+            this.eventBus.emit('ui:render:query-params');
+        }
+
+        removeQueryParam(index) {
+            const query = this.stateManager.get('request.query');
+            query.splice(index, 1);
+            this.stateManager.set('request.query', query);
+            this.eventBus.emit('ui:render:query-params');
+        }
+
+        updateQueryParam(index, field, value) {
+            const query = this.stateManager.get('request.query');
+            query[index][field] = value;
+            this.stateManager.set('request.query', query);
+        }
+
+        addHeader() {
+            const headers = this.stateManager.get('request.headers');
+            headers.push({ key: '', value: '' });
+            this.stateManager.set('request.headers', headers);
+            this.eventBus.emit('ui:render:headers');
+        }
+
+        removeHeader(index) {
+            const headers = this.stateManager.get('request.headers');
+            headers.splice(index, 1);
+            this.stateManager.set('request.headers', headers);
+            this.eventBus.emit('ui:render:headers');
+        }
+
+        updateHeader(index, field, value) {
+            const headers = this.stateManager.get('request.headers');
+            headers[index][field] = value;
+            this.stateManager.set('request.headers', headers);
+        }
+
+        buildQueryString(params) {
+            const validParams = params.filter(p => p.key && p.value);
+            if (validParams.length === 0) return '';
+            const queryString = validParams
+                .map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`)
+                .join('&');
+            return '?' + queryString;
+        }
+
+        buildHeaders(headers, method) {
+            const result = {};
+            headers.forEach(h => {
+                if (h.key && h.value) {
+                    result[h.key] = h.value;
+                }
+            });
+
+            // Auto-add Content-Type for methods that typically send JSON
+            if (['POST', 'PUT', 'PATCH'].includes(method)) {
+                if (!result['Content-Type']) {
+                    result['Content-Type'] = 'application/json';
+                }
+            }
+
+            const token = this.authManager.getCurrentToken();
+            if (token && !result['Authorization']) {
+                result['Authorization'] = `Bearer ${token}`;
+            }
+            return result;
+        }
+
+        async sendRequest() {
+            const method = this.stateManager.get('request.method');
+            let url = this.stateManager.get('request.url');
+            const query = this.stateManager.get('request.query');
+            const headers = this.stateManager.get('request.headers');
+            const body = this.stateManager.get('request.body');
+
+            const baseUrl = this.authManager.getCurrentBaseUrl();
+            const queryString = this.buildQueryString(query);
+            const fullUrl = baseUrl + url + queryString;
+            const requestHeaders = this.buildHeaders(headers, method);
+
+            const options = { method, headers: requestHeaders };
+
+            if (['POST', 'PUT', 'PATCH'].includes(method) && body.trim()) {
+                try {
+                    JSON.parse(body);
+                    options.body = body;
+                } catch (e) {
+                    this.eventBus.emit('request:error', {
+                        error: 'Invalid JSON body',
+                        details: e.message
+                    });
+                    return;
+                }
+            }
+
+            this.eventBus.emit('request:start', { method, url });
+            const startTime = performance.now();
+
+            try {
+                const response = await fetch(fullUrl, options);
+                const endTime = performance.now();
+                const time = Math.round(endTime - startTime);
+
+                const contentType = response.headers.get('content-type');
+                let responseBody;
+                if (contentType && contentType.includes('application/json')) {
+                    responseBody = await response.json();
+                } else {
+                    responseBody = await response.text();
+                }
+
+                const size = JSON.stringify(responseBody).length;
+
+                this.stateManager.set('response', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    body: responseBody,
+                    time,
+                    size,
+                    timestamp: new Date().toISOString()
+                });
+
+                this.eventBus.emit('request:complete', {
+                    method,
+                    url,
+                    status: response.status,
+                    time,
+                    size
+                });
+
+            } catch (error) {
+                this.eventBus.emit('request:error', {
+                    error: error.message,
+                    details: error.stack
+                });
+            }
+        }
+
+        copyResponse() {
+            const response = this.stateManager.get('response');
+            const text = typeof response.body === 'string'
+                ? response.body
+                : JSON.stringify(response.body, null, 2);
+            navigator.clipboard.writeText(text).then(() => {
+                this.eventBus.emit('ui:notification', { message: 'Response copied to clipboard' });
+            });
+        }
+
+        downloadResponse() {
+            const response = this.stateManager.get('response');
+            const text = typeof response.body === 'string'
+                ? response.body
+                : JSON.stringify(response.body, null, 2);
+            const blob = new Blob([text], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `response-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        quickLogin() {
+            // Login as Super Admin
+            const loginRequest = {
+                email: 'admin@k12.com',
+                password: 'admin123'
+            };
+            this.populateLoginRequest(loginRequest);
+            this.sendRequest();
+        }
+
+        quickLoginTenant() {
+            // Login as Tenant Admin (example)
+            const loginRequest = {
+                email: 'tenant-admin@k12.com',
+                password: 'TenantPass123!'
+            };
+            this.populateLoginRequest(loginRequest);
+            this.sendRequest();
+        }
+
+        populateLoginRequest(credentials) {
+            this.stateManager.set('request.method', 'POST');
+            this.stateManager.set('request.url', '/api/auth/login');
+            this.stateManager.set('request.body', JSON.stringify(credentials, null, 2));
+
+            // Update UI
+            const methodSelect = document.getElementById('request-method');
+            if (methodSelect) {
+                methodSelect.value = 'POST';
+                methodSelect.dispatchEvent(new Event('change'));
+            }
+
+            const urlInput = document.getElementById('request-url');
+            if (urlInput) {
+                urlInput.value = '/api/auth/login';
+            }
+
+            const bodyInput = document.getElementById('request-body');
+            if (bodyInput) {
+                bodyInput.value = JSON.stringify(credentials, null, 2);
+            }
+        }
+    }
+
+    /**
+     * UIManager - UI rendering and interaction
+     */
+    class UIManager {
+        constructor(stateManager, eventBus) {
+            this.stateManager = stateManager;
+            this.eventBus = eventBus;
+            this.loadFromStorage();
+            this.setupEventListeners();
+            this.setupKeyboardShortcuts();
+            this.subscribeToEvents();
+        }
+
+        loadFromStorage() {
+            const storage = new StorageManager();
+            const uiState = storage.get('ui:state', {});
+            if (uiState.darkMode) {
+                this.setDarkMode(true, false);
+            }
+            if (uiState.collapsedSections) {
+                this.stateManager.set('ui.collapsedSections', uiState.collapsedSections);
+            }
+        }
+
+        saveToStorage() {
+            const storage = new StorageManager();
+            storage.set('ui:state', {
+                darkMode: this.stateManager.get('ui.darkMode'),
+                collapsedSections: this.stateManager.get('ui.collapsedSections')
+            });
+        }
+
+        setupEventListeners() {
+            document.getElementById('theme-toggle').addEventListener('click', () => {
+                this.toggleDarkMode();
+            });
+
+            document.getElementById('help-toggle').addEventListener('click', () => {
+                this.openHelpModal();
+            });
+
+            document.getElementById('auth-profile-select').addEventListener('change', (e) => {
+                this.eventBus.emit('auth:profile:changed', { profile: e.target.value });
+            });
+
+            document.getElementById('request-method').addEventListener('change', (e) => {
+                const method = e.target.value;
+                this.stateManager.set('request.method', method);
+                const badge = document.getElementById('method-badge');
+                if (badge) {
+                    badge.className = `method-badge method-${method}`;
+                    badge.textContent = method;
+                }
+                const bodyInput = document.getElementById('request-body');
+                bodyInput.closest('.mb-2').style.display = ['POST', 'PUT', 'PATCH'].includes(method) ? 'block' : 'none';
+            });
+
+            document.getElementById('request-url').addEventListener('input', (e) => {
+                this.stateManager.set('request.url', e.target.value);
+            });
+
+            document.getElementById('mobile-toggle').addEventListener('click', () => {
+                document.getElementById('try-panel').classList.toggle('active');
+            });
+
+            document.getElementById('help-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'help-modal') {
+                    this.closeModal();
+                }
+            });
+
+            document.getElementById('send-btn').addEventListener('click', () => {
+                this.eventBus.emit('request:send');
+            });
+        }
+
+        setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                const ctrl = e.ctrlKey || e.metaKey;
+                if (ctrl && e.key === 'Enter') {
+                    e.preventDefault();
+                    this.eventBus.emit('request:send');
+                }
+                if (ctrl && e.key === 'k') {
+                    e.preventDefault();
+                    document.getElementById('request-url').focus();
+                }
+                if (ctrl && e.key === 'h') {
+                    e.preventDefault();
+                    this.toggleSection('history');
+                }
+                if (ctrl && e.key === 'f') {
+                    e.preventDefault();
+                    this.toggleSection('favorites');
+                }
+                if (ctrl && e.key === 'd') {
+                    e.preventDefault();
+                    this.toggleDarkMode();
+                }
+                if (ctrl && e.key === 'n') {
+                    e.preventDefault();
+                    this.newRequest();
+                }
+                if (e.key === 'Escape') {
+                    this.closeModal();
+                }
+            });
+        }
+
+        subscribeToEvents() {
+            this.eventBus.on('auth:token:expiring', ({ minutesLeft }) => {
+                this.showWarning(`Token expires in ${minutesLeft} minute(s)`);
+            });
+
+            this.eventBus.on('auth:token:expired', () => {
+                this.showWarning('Token has expired. Please log in again.');
+            });
+
+            this.eventBus.on('request:start', () => {
+                this.setLoadingState(true);
+            });
+
+            this.eventBus.on('request:complete', () => {
+                this.setLoadingState(false);
+                this.renderResponse();
+            });
+
+            this.eventBus.on('request:error', ({ error }) => {
+                this.setLoadingState(false);
+                this.showError(error);
+            });
+
+            this.eventBus.on('ui:render:query-params', () => this.renderQueryParams());
+            this.eventBus.on('ui:render:headers', () => this.renderHeaders());
+            this.eventBus.on('ui:render:history', () => this.renderHistory());
+            this.eventBus.on('ui:render:favorites', () => this.renderFavorites());
+
+            this.eventBus.on('history:replay', (entry) => {
+                this.populateRequest(entry.method, entry.url);
+                this.sendRequest();
+            });
+
+            this.eventBus.on('favorite:replay', (entry) => {
+                this.populateRequestFull(entry);
+            });
+
+            this.eventBus.on('history:added', () => this.renderHistory());
+            this.eventBus.on('favorite:added', () => this.renderFavorites());
+            this.eventBus.on('favorite:removed', () => this.renderFavorites());
+            this.eventBus.on('history:cleared', () => this.renderHistory());
+            this.eventBus.on('favorites:imported', ({ count }) => {
+                this.showNotification(`Imported ${count} favorites`);
+                this.renderFavorites();
+            });
+
+            this.eventBus.on('ui:notification', ({ message }) => {
+                this.showNotification(message);
+            });
+        }
+
+        toggleSection(sectionId) {
+            const section = document.getElementById(`${sectionId}-section`);
+            section.classList.toggle('collapsed');
+            this.saveToStorage();
+        }
+
+        toggleDarkMode() {
+            const current = this.stateManager.get('ui.darkMode');
+            this.setDarkMode(!current);
+        }
+
+        setDarkMode(enabled, save = true) {
+            document.documentElement.setAttribute('data-theme', enabled ? 'dark' : 'light');
+            this.stateManager.set('ui.darkMode', enabled);
+            document.getElementById('theme-toggle').textContent = enabled ? '☀️' : '🌙';
+            if (save) this.saveToStorage();
+        }
+
+        setLoadingState(loading) {
+            const icon = document.getElementById('send-icon');
+            const text = document.getElementById('send-text');
+            const spinner = document.getElementById('send-spinner');
+            if (loading) {
+                icon.classList.add('hidden');
+                text.classList.add('hidden');
+                spinner.classList.remove('hidden');
+            } else {
+                icon.classList.remove('hidden');
+                text.classList.remove('hidden');
+                spinner.classList.add('hidden');
+            }
+        }
+
+        renderQueryParams() {
+            const container = document.getElementById('query-params');
+            const params = this.stateManager.get('request.query');
+            container.innerHTML = params.map((param, index) => `
+                <div class="kv-row">
+                    <input type="text" class="kv-key" placeholder="Key" value="${param.key}"
+                        onchange="app.requestManager.updateQueryParam(${index}, 'key', this.value)">
+                    <input type="text" class="kv-value" placeholder="Value" value="${param.value}"
+                        onchange="app.requestManager.updateQueryParam(${index}, 'value', this.value)">
+                    <button class="btn-icon kv-delete" onclick="app.requestManager.removeQueryParam(${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        renderHeaders() {
+            const container = document.getElementById('headers');
+            const headers = this.stateManager.get('request.headers');
+            container.innerHTML = headers.map((header, index) => `
+                <div class="kv-row">
+                    <input type="text" class="kv-key" placeholder="Key" value="${header.key}"
+                        onchange="app.requestManager.updateHeader(${index}, 'key', this.value)">
+                    <input type="text" class="kv-value" placeholder="Value" value="${header.value}"
+                        onchange="app.requestManager.updateHeader(${index}, 'value', this.value)">
+                    <button class="btn-icon kv-delete" onclick="app.requestManager.removeHeader(${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        renderResponse() {
+            const response = this.stateManager.get('response');
+            const section = document.getElementById('response-section');
+            const badge = document.getElementById('status-badge');
+            const body = document.getElementById('response-body');
+            const timeEl = document.getElementById('response-time');
+            const sizeEl = document.getElementById('response-size');
+
+            section.classList.remove('hidden');
+            const status = response.status;
+            badge.textContent = `${status} ${this.getStatusText(status)}`;
+            badge.className = `status-badge ${status >= 200 && status < 300 ? 'status-2xx' : status >= 400 && status < 500 ? 'status-4xx' : 'status-5xx'}`;
+            timeEl.textContent = `${response.time}ms`;
+            sizeEl.textContent = this.formatBytes(response.size);
+
+            const view = this.stateManager.get('ui.responseView');
+            if (view === 'pretty' && typeof response.body === 'object') {
+                body.innerHTML = this.syntaxHighlight(JSON.stringify(response.body, null, 2));
+            } else {
+                body.textContent = typeof response.body === 'string'
+                    ? response.body
+                    : JSON.stringify(response.body, null, 2);
+            }
+        }
+
+        syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return `<span class="${cls}">${match}</span>`;
+            });
+        }
+
+        renderHistory() {
+            const container = document.getElementById('history-list');
+            const history = this.stateManager.get('history');
+            const count = document.getElementById('history-count');
+            count.textContent = history.length;
+            if (history.length === 0) {
+                container.innerHTML = '<div class="text-sm text-muted">No history yet</div>';
+                return;
+            }
+            container.innerHTML = history.map(entry => `
+                <div class="history-item" style="padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer;"
+                    onclick="app.historyManager.replayHistory(${entry.id})">
+                    <div class="flex gap-2">
+                        <span class="method-badge method-${entry.method}">${entry.method}</span>
+                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">${entry.url}</span>
+                        <span class="status-badge ${entry.status >= 200 && entry.status < 300 ? 'status-2xx' : 'status-4xx'}">${entry.status}</span>
+                    </div>
+                    <div class="text-sm text-muted">${new Date(entry.timestamp).toLocaleTimeString()} • ${entry.time}ms • ${this.formatBytes(entry.size)}</div>
+                </div>
+            `).join('');
+        }
+
+        renderFavorites() {
+            const container = document.getElementById('favorites-list');
+            const favorites = this.stateManager.get('favorites');
+            const count = document.getElementById('favorites-count');
+            count.textContent = favorites.length;
+            if (favorites.length === 0) {
+                container.innerHTML = '<div class="text-sm text-muted">No favorites yet</div>';
+                return;
+            }
+            container.innerHTML = favorites.map(entry => `
+                <div class="favorite-item" style="padding: 8px; border-bottom: 1px solid var(--border-color);">
+                    <div class="flex gap-2">
+                        <span class="method-badge method-${entry.method}">${entry.method}</span>
+                        <span style="flex: 1; font-weight: 500;">${entry.name}</span>
+                        <button class="btn-icon btn-sm" onclick="app.historyManager.removeFavorite(${entry.id})">×</button>
+                    </div>
+                    <div class="text-sm text-muted" style="margin-top: 4px;">${entry.url}</div>
+                    <button class="btn btn-ghost btn-sm" style="margin-top: 4px; width: 100%;"
+                        onclick="app.historyManager.replayFavorite(${entry.id})">▶ Replay</button>
+                </div>
+            `).join('');
+        }
+
+        populateRequest(method, url) {
+            document.getElementById('request-method').value = method;
+            document.getElementById('request-method').dispatchEvent(new Event('change'));
+            document.getElementById('request-url').value = url;
+            this.stateManager.set('request.method', method);
+            this.stateManager.set('request.url', url);
+        }
+
+        populateRequestFull(entry) {
+            this.populateRequest(entry.method, entry.url);
+            if (entry.query) {
+                this.stateManager.set('request.query', entry.query);
+                this.eventBus.emit('ui:render:query-params');
+            }
+            if (entry.headers) {
+                this.stateManager.set('request.headers', entry.headers);
+                this.eventBus.emit('ui:render:headers');
+            }
+            if (entry.body) {
+                this.stateManager.set('request.body', entry.body);
+                document.getElementById('request-body').value = entry.body;
+            }
+        }
+
+        newRequest() {
+            this.stateManager.set('request.method', 'GET');
+            this.stateManager.set('request.url', '/q/health');
+            this.stateManager.set('request.query', [{ key: '', value: '' }]);
+            this.stateManager.set('request.body', '');
+            document.getElementById('request-method').value = 'GET';
+            document.getElementById('request-method').dispatchEvent(new Event('change'));
+            document.getElementById('request-url').value = '/q/health';
+            document.getElementById('request-body').value = '';
+            this.eventBus.emit('ui:render:query-params');
+        }
+
+        openHelpModal() {
+            document.getElementById('help-modal').classList.remove('hidden');
+        }
+
+        closeModal() {
+            document.getElementById('help-modal').classList.add('hidden');
+        }
+
+        showNotification(message) {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 16px;
+                right: 16px;
+                background: var(--accent-primary);
+                color: white;
+                padding: 12px 16px;
+                border-radius: 6px;
+                z-index: 1000;
+                animation: fadeIn 0.3s;
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        showWarning(message) {
+            const warningEl = document.getElementById('token-warning');
+            warningEl.textContent = '⚠️ ' + message;
+            warningEl.classList.remove('hidden');
+            setTimeout(() => warningEl.classList.add('hidden'), 5000);
+        }
+
+        showError(error) {
+            alert('Request failed: ' + error);
+        }
+
+        setResponseView(view) {
+            this.stateManager.set('ui.responseView', view);
+            this.renderResponse();
+        }
+
+        getStatusText(status) {
+            const texts = {
+                200: 'OK', 201: 'Created', 204: 'No Content',
+                400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found',
+                500: 'Internal Server Error'
+            };
+            return texts[status] || 'Unknown';
+        }
+
+        formatBytes(bytes) {
+            if (bytes < 1024) return bytes + 'B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+        }
+
+        sendRequest() {
+            this.eventBus.emit('request:send');
+        }
+
+        saveAsFavorite() {
+            const name = prompt('Enter a name for this favorite:');
+            if (name) {
+                const requestData = {
+                    method: this.stateManager.get('request.method'),
+                    url: this.stateManager.get('request.url'),
+                    query: this.stateManager.get('request.query'),
+                    headers: this.stateManager.get('request.headers'),
+                    body: this.stateManager.get('request.body')
+                };
+                app.historyManager.addFavorite(name, requestData);
+            }
+        }
+
+        exportFavorites() {
+            app.historyManager.exportFavorites();
+        }
+
+        importFavorites(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const result = app.historyManager.importFavorites(e.target.result);
+                    if (result.success) {
+                        this.showNotification(`Imported ${result.count} favorites`);
+                    } else {
+                        this.showError(result.error);
+                    }
+                };
+                reader.readAsText(file);
+            }
+            input.value = '';
+        }
+    }
+
+    // ============================================
+    // REDOC INTEGRATION
+    // ============================================
+
+    class RedocIntegrator {
+        /**
+         * RedocIntegrator - Deep integration with Redoc documentation panel
+         *
+         * Features:
+         * - Click endpoints in Redoc to auto-populate request builder
+         * - "Try in Panel" buttons on each endpoint
+         * - Example JSON generation from OpenAPI schemas
+         * - Visual highlighting of selected endpoint
+         * - Query parameter population from spec
+         * - DOM event interception via event delegation
+         * - MutationObserver for lazy-loaded content
+         *
+         * Usage:
+         * - Automatically initialized by APIConsole
+         * - Click any endpoint in left panel to load into request builder
+         * - Click "🚀 Try in Panel" button for quick access
+         *
+         * Events emitted:
+         * - 'redoc:endpoint:clicked' - When user clicks an endpoint
+         *
+         * Methods:
+         * - init() - Initialize the integrator (fetch spec, attach interceptors, inject buttons)
+         * - fetchOpenAPISpec() - Fetch OpenAPI specification from backend
+         * - extractEndpointInfo(element) - Parse endpoint from DOM element
+         * - generateJSONFromSchema(schema) - Generate example from schema
+         * - highlightEndpoint(method, path) - Visually highlight selected endpoint
+         * - destroy() - Clean up resources (disconnect observers, remove listeners)
+         *
+         * Requirements:
+         * - Redoc must be initialized before RedocIntegrator.init()
+         * - OpenAPI spec must be available at http://localhost:8080/q/openapi
+         * - Browser must support MutationObserver
+         */
+        constructor(eventBus, stateManager, uiManager) {
+            this.eventBus = eventBus;
+            this.stateManager = stateManager;
+            this.uiManager = uiManager;
+            this.openAPISpec = null;
+            this.docsPanel = null;
+            this.tryButtonsInjected = false;
+            this.observer = null;
+            this.highlightTimeout = null;
+            this._clickHandler = null;
+        }
+
+        async init() {
+            try {
+                // Fetch OpenAPI spec
+                await this.fetchOpenAPISpec();
+
+                // Get docs panel element
+                this.docsPanel = document.getElementById('redoc');
+
+                if (!this.docsPanel) {
+                    console.warn('Redoc panel not found');
+                    return;
+                }
+
+                // Attach DOM event interceptors
+                this.attachInterceptors();
+
+                // Inject "Try in Panel" buttons
+                this.injectTryButtons();
+
+                // Subscribe to events
+                this.subscribeToEvents();
+            } catch (error) {
+                console.error('RedocIntegrator initialization failed:', error);
+            }
+        }
+
+        async fetchOpenAPISpec() {
+            try {
+                const response = await fetch('/q/openapi');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch OpenAPI spec: ${response.status}`);
+                }
+                this.openAPISpec = await response.json();
+                console.log('OpenAPI spec loaded:', Object.keys(this.openAPISpec));
+            } catch (error) {
+                console.error('Failed to fetch OpenAPI spec:', error);
+                this.openAPISpec = null;
+            }
+        }
+
+        attachInterceptors() {
+            if (!this.docsPanel) return;
+
+            // Store handler as instance property for cleanup in destroy()
+            this._clickHandler = (e) => {
+                // Find closest element with data-section-id (Redoc endpoint markers)
+                const endpointElement = e.target.closest('[data-section-id]');
+
+                if (!endpointElement) return;
+
+                // Extract endpoint info
+                const endpointInfo = this.extractEndpointInfo(endpointElement);
+                if (!endpointInfo) return;
+
+                // Check if this is an endpoint section (not tag, parameter, schema, etc.)
+                if (!endpointInfo.sectionId.includes('/paths/')) return;
+
+                // Emit event to populate request builder
+                this.eventBus.emit('redoc:endpoint:clicked', endpointInfo);
+
+                // Highlight the selected endpoint
+                this.highlightEndpoint(endpointInfo.method, endpointInfo.path, endpointInfo.sectionId);
+            };
+
+            // Use event delegation to intercept clicks on Redoc endpoints
+            this.docsPanel.addEventListener('click', this._clickHandler);
+
+            console.log('Redoc DOM interceptors attached');
+        }
+
+        injectTryButtons() {
+            if (!this.docsPanel || this.tryButtonsInjected) return;
+
+            // Initial scan for existing endpoints
+            this.scanAndInjectButtons();
+
+            // Set up MutationObserver to watch for new endpoints (Redoc lazy-loads content)
+            this.observer = new MutationObserver((mutations) => {
+                // Only rescan if mutations contain endpoint sections (performance optimization)
+                const hasRelevantMutations = mutations.some((mutation) => {
+                    return Array.from(mutation.addedNodes).some((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            return node.querySelector && node.querySelector('[data-section-id*="/paths/"]') ||
+                                   (node.getAttribute && node.getAttribute('data-section-id')?.includes('/paths/'));
+                        }
+                        return false;
+                    });
+                });
+
+                if (hasRelevantMutations) {
+                    this.scanAndInjectButtons();
+                }
+            });
+
+            this.observer.observe(this.docsPanel, {
+                childList: true,
+                subtree: true
+            });
+
+            this.tryButtonsInjected = true;
+            console.log('Try in Panel button injection initialized');
+        }
+
+        scanAndInjectButtons() {
+            // Find all endpoint sections (Redoc uses data-section-id with "/paths/" pattern)
+            const endpoints = this.docsPanel.querySelectorAll('[data-section-id*="/paths/"]');
+
+            endpoints.forEach((endpoint) => {
+                // Skip if already has button
+                if (endpoint.querySelector('.try-in-panel-btn')) return;
+
+                // Extract endpoint info to get method, path, and sectionId
+                const endpointInfo = this.extractEndpointInfo(endpoint);
+                if (!endpointInfo) return;
+
+                const { method, path, sectionId } = endpointInfo;
+
+                // Find the method button (e.g., "post /api/auth/login")
+                // Redoc renders this as a button with the method and path
+                const methodButton = endpoint.querySelector('button[class*="opblock-summary"]');
+                if (!methodButton) return;
+
+                // Create "Try in Panel" button
+                const button = document.createElement('button');
+                button.className = 'try-in-panel-btn';
+                button.innerHTML = '🚀 Try in Panel';
+                button.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    this.eventBus.emit('redoc:endpoint:clicked', endpointInfo);
+                    this.highlightEndpoint(method, path, sectionId);
+                };
+
+                // Append button after method button
+                methodButton.parentElement.appendChild(button);
+            });
+        }
+
+        subscribeToEvents() {
+            // When endpoint is clicked, populate request builder
+            this.eventBus.on('redoc:endpoint:clicked', (endpointInfo) => {
+                this.populateRequestBuilder(endpointInfo);
+            });
+        }
+
+        extractEndpointInfo(element) {
+            // Redoc uses data-section-id attribute like "tag/Authentication/paths/~1api~1auth~1login/post"
+            const sectionId = element.getAttribute('data-section-id');
+            if (!sectionId) {
+                console.warn('No data-section-id found on element');
+                return null;
+            }
+
+            // Parse: "tag/.../paths/~1api~1auth~1login/post"
+            // ~1 is URL encoding for /, so ~1api~1auth~1login → /api/auth/login
+            let match = sectionId.match(/\/paths\/(.+)\/(\w+)$/);
+            if (!match) {
+                // Try alternate format: "Operation/get-/api/users"
+                match = sectionId.match(/Operation\/([^-]+)-(.+)$/);
+                if (!match) {
+                    console.warn('Could not parse section-id:', sectionId);
+                    return null;
+                }
+                // Alternate format: method is first group, path is second
+                const method = match[1].toUpperCase();
+                const path = match[2];
+                const endpointDetails = this.getEndpointDetailsFromSpec(method, path);
+                return { method, path, sectionId, ...endpointDetails };
+            }
+
+            // Redoc format: path with URL encoding (~1 = /) is first, method is second
+            const encodedPath = match[1];
+            const method = match[2].toUpperCase();
+
+            // Decode URL encoding: ~1 → /
+            // Note: encodedPath may start with ~1 (representing the leading /)
+            let path = encodedPath.replace(/~1/g, '/');
+
+            // If path doesn't start with /, add it
+            if (!path.startsWith('/')) {
+                path = '/' + path;
+            }
+
+            console.log('Extracted endpoint:', { method, path, encodedPath, sectionId });
+
+            // Look up endpoint details in OpenAPI spec
+            const endpointDetails = this.getEndpointDetailsFromSpec(method, path);
+
+            return {
+                method,
+                path,
+                sectionId,
+                ...endpointDetails
+            };
+        }
+
+        getEndpointDetailsFromSpec(method, path) {
+            if (!this.openAPISpec || !this.openAPISpec.paths) {
+                return {};
+            }
+
+            const pathObj = this.openAPISpec.paths[path];
+            if (!pathObj) {
+                console.warn(`Path not found in OpenAPI spec: ${path}`);
+                return {};
+            }
+
+            const methodLower = method.toLowerCase();
+            const endpoint = pathObj[methodLower];
+            if (!endpoint) {
+                console.warn(`Method ${method} not found for path: ${path}`);
+                return {};
+            }
+
+            // Extract summary, description, parameters, requestBody
+            return {
+                summary: endpoint.summary || '',
+                description: endpoint.description || '',
+                parameters: endpoint.parameters || [],
+                requestBody: endpoint.requestBody || null,
+                responses: endpoint.responses || {}
+            };
+        }
+
+        generateJSONFromSchema(schema, visited = new Set(), depth = 0) {
+            const MAX_DEPTH = 20;
+
+            // Guard against null/undefined
+            if (!schema) return null;
+
+            // Prevent infinite recursion from circular references
+            const schemaId = schema.$ref || JSON.stringify(schema);
+            if (visited.has(schemaId)) {
+                console.warn('Circular reference detected in schema, stopping recursion');
+                return null;
+            }
+
+            // Prevent excessive recursion depth
+            if (depth > MAX_DEPTH) {
+                console.warn('Maximum schema depth exceeded, stopping recursion');
+                return null;
+            }
+
+            // Create new visited set for this branch
+            const newVisited = new Set(visited);
+            newVisited.add(schemaId);
+
+            // Handle $ref with safe path resolution
+            if (schema.$ref) {
+                const refPath = schema.$ref.replace('#/', '').split('/');
+                let ref = this.openAPISpec;
+
+                // Safely navigate the path, checking each segment
+                for (const part of refPath) {
+                    if (!ref || typeof ref !== 'object') {
+                        console.warn(`Invalid $ref path: ${schema.$ref} - segment "${part}" not found`);
+                        return null;
+                    }
+                    if (!(part in ref)) {
+                        console.warn(`Invalid $ref path: ${schema.$ref} - property "${part}" does not exist`);
+                        return null;
+                    }
+                    ref = ref[part];
+                }
+
+                // Recursively resolve the reference
+                return this.generateJSONFromSchema(ref, newVisited, depth + 1);
+            }
+
+            // Handle allOf (before type check to ensure composition works)
+            if (schema.allOf) {
+                const merged = {};
+                for (const subSchema of schema.allOf) {
+                    const subResult = this.generateJSONFromSchema(subSchema, newVisited, depth + 1);
+                    if (subResult && typeof subResult === 'object') {
+                        Object.assign(merged, subResult);
+                    }
+                }
+                return merged;
+            }
+
+            // Handle primitive types
+            if (schema.type === 'string') {
+                return schema.example || (schema.enum ? schema.enum[0] : 'string');
+            }
+            if (schema.type === 'number' || schema.type === 'integer') {
+                return schema.example || (schema.minimum || 0);
+            }
+            if (schema.type === 'boolean') {
+                return schema.example !== undefined ? schema.example : true;
+            }
+
+            // Handle arrays
+            if (schema.type === 'array') {
+                const itemExample = this.generateJSONFromSchema(schema.items || {}, newVisited, depth + 1);
+                return [itemExample];
+            }
+
+            // Handle objects
+            if (schema.type === 'object' || schema.properties) {
+                const obj = {};
+
+                // If schema.required exists, only include required properties
+                // Otherwise include all properties
+                const properties = schema.properties || {};
+                const required = schema.required || [];
+
+                for (const [propName, propSchema] of Object.entries(properties)) {
+                    // If there's a required array, only include required properties
+                    if (required.length > 0 && !required.includes(propName)) {
+                        continue;
+                    }
+                    obj[propName] = this.generateJSONFromSchema(propSchema, newVisited, depth + 1);
+                }
+                return obj;
+            }
+
+            // Fallback for unknown types
+            return null;
+        }
+
+        generateExampleBody(requestBody) {
+            if (!requestBody || !requestBody.content) {
+                return '';
+            }
+
+            // Find JSON content type
+            const jsonContent = requestBody.content['application/json'];
+            if (!jsonContent || !jsonContent.schema) {
+                return '';
+            }
+
+            const example = this.generateJSONFromSchema(jsonContent.schema);
+            if (!example) {
+                return '';
+            }
+            return JSON.stringify(example, null, 2);
+        }
+
+        populateRequestBuilder(endpointInfo) {
+            const { method, path, parameters, requestBody } = endpointInfo;
+
+            // Set method and URL
+            this.stateManager.set('request.method', method);
+            this.stateManager.set('request.url', path);
+
+            // Update UI dropdowns with null checks
+            const methodSelect = document.getElementById('request-method');
+            if (methodSelect) {
+                methodSelect.value = method;
+                methodSelect.dispatchEvent(new Event('change'));
+            }
+
+            const urlInput = document.getElementById('request-url');
+            if (urlInput) {
+                urlInput.value = path;
+            }
+
+            // Populate query parameters from spec
+            const queryParams = parameters
+                ? parameters
+                    .filter(p => p.in === 'query')
+                    .map(p => ({ key: p.name, value: p.example || '' }))
+                : [{ key: '', value: '' }];
+
+            this.stateManager.set('request.query', queryParams);
+            this.eventBus.emit('ui:render:query-params');
+
+            // Generate example request body if applicable
+            if (['POST', 'PUT', 'PATCH'].includes(method) && requestBody) {
+                const exampleBody = this.generateExampleBody(requestBody);
+                if (exampleBody) {
+                    this.stateManager.set('request.body', exampleBody);
+                    const bodyInput = document.getElementById('request-body');
+                    if (bodyInput) {
+                        bodyInput.value = exampleBody;
+                    }
+                }
+            }
+
+            // Show notification
+            this.eventBus.emit('ui:notification', {
+                message: `Loaded ${method} ${path} from docs`
+            });
+        }
+
+        highlightEndpoint(method, path, sectionId = null) {
+            // Clear existing timeout to prevent orphaned callbacks
+            if (this.highlightTimeout) {
+                clearTimeout(this.highlightTimeout);
+            }
+
+            // Remove previous highlights
+            document.querySelectorAll('.endpoint-active').forEach(el => {
+                el.classList.remove('endpoint-active');
+            });
+
+            // If sectionId is provided, use it directly
+            if (sectionId) {
+                const endpointEl = this.docsPanel.querySelector(`[data-section-id="${sectionId}"]`);
+                if (endpointEl) {
+                    // Add highlight class
+                    endpointEl.classList.add('endpoint-active');
+
+                    // Scroll into view if not visible
+                    endpointEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                    // Remove highlight after 2 seconds
+                    this.highlightTimeout = setTimeout(() => {
+                        endpointEl.classList.remove('endpoint-active');
+                        this.highlightTimeout = null;
+                    }, 2000);
+                }
+                return;
+            }
+
+            // Otherwise, try to find by constructing the section ID
+            // Encode the path (replace / with ~1)
+            const encodedPath = path.substring(1).replace(/\//g, '~1');
+
+            // Try to find any element with matching method at the end
+            const possibleId = `/paths/${encodedPath}/${method.toLowerCase()}`;
+            const endpointEl = this.docsPanel.querySelector(`[data-section-id$="${possibleId}"]`);
+
+            if (endpointEl) {
+                // Add highlight class
+                endpointEl.classList.add('endpoint-active');
+
+                // Scroll into view if not visible
+                endpointEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                // Remove highlight after 2 seconds
+                this.highlightTimeout = setTimeout(() => {
+                    endpointEl.classList.remove('endpoint-active');
+                    this.highlightTimeout = null;
+                }, 2000);
+            }
+        }
+
+        destroy() {
+            // Clear highlight timeout to prevent orphaned callbacks
+            if (this.highlightTimeout) {
+                clearTimeout(this.highlightTimeout);
+                this.highlightTimeout = null;
+            }
+
+            // Remove event listener to prevent memory leaks
+            if (this._clickHandler && this.docsPanel) {
+                this.docsPanel.removeEventListener('click', this._clickHandler);
+                this._clickHandler = null;
+                console.log('Redoc DOM interceptor removed');
+            }
+
+            // Disconnect MutationObserver to prevent memory leaks
+            if (this.observer) {
+                this.observer.disconnect();
+                this.observer = null;
+                console.log('RedocIntegrator destroyed, observer disconnected');
+            }
+        }
+    }
+
+    // ============================================
+    // APPLICATION INITIALIZATION
+    // ============================================
+
+    class APIConsole {
+        constructor() {
+            // Initialize core utilities
+            this.eventBus = new EventEmitter();
+            this.storage = new StorageManager();
+            this.stateManager = new StateManager(this.eventBus);
+
+            // Initialize managers
+            this.authManager = new AuthManager(this.stateManager, this.storage, this.eventBus);
+            this.historyManager = new HistoryManager(this.stateManager, this.storage, this.eventBus);
+            this.requestManager = new RequestManager(this.stateManager, this.authManager, this.eventBus);
+            this.uiManager = new UIManager(this.stateManager, this.eventBus);
+
+            // Initialize RedocIntegrator
+            this.redocIntegrator = new RedocIntegrator(this.eventBus, this.stateManager, this.uiManager);
+
+            // Wire up request sending
+            this.eventBus.on('request:send', () => this.requestManager.sendRequest());
+
+            // Wire up auth profile switching
+            this.eventBus.on('auth:profile:changed', ({ profile }) => {
+                this.authManager.switchProfile(profile);
+            });
+
+            // Initial render
+            this.uiManager.renderQueryParams();
+            this.uiManager.renderHeaders();
+            this.uiManager.renderHistory();
+            this.uiManager.renderFavorites();
+
+            // Initialize Redoc
+            this.initRedoc();
+        }
+
+        initRedoc() {
+            Redoc.init(
+                "/q/openapi",
+                {
+                    scrollYOffset: 0
+                },
+                document.getElementById('redoc')
+            );
+
+            // Initialize RedocIntegrator after Redoc loads
+            setTimeout(() => {
+                this.redocIntegrator.init();
+            }, 1000);
+        }
+    }
+
+    // Initialize application
+    const app = new APIConsole();
+</script>
+</body>
+</html>
