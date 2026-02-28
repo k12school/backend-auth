@@ -3734,8 +3734,57 @@
         }
 
         renderConnections() {
-            // Will be implemented in next task
-            console.log('Rendering connections:', this.flowConnections.length);
+            if (!this.connectionsSvg) return;
+
+            // Clear existing connections
+            this.connectionsSvg.innerHTML = '';
+
+            // Add marker (arrowhead)
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <marker id="arrowhead" markerWidth="10" markerHeight="7"
+                        refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" class="connection-arrow"/>
+                </marker>
+            `;
+            this.connectionsSvg.appendChild(defs);
+
+            // Draw connections
+            this.flowConnections.forEach(conn => {
+                this.drawConnection(conn.from, conn.to);
+            });
+        }
+
+        drawConnection(fromId, toId) {
+            const fromNode = this.flowNodes.find(n => n.id === fromId);
+            const toNode = this.flowNodes.find(n => n.id === toId);
+
+            if (!fromNode || !toNode) return;
+
+            const fromEl = document.getElementById(fromId);
+            const toEl = document.getElementById(toId);
+
+            if (!fromEl || !toEl) return;
+
+            // Get connector positions
+            const fromRect = fromEl.getBoundingClientRect();
+            const toRect = toEl.getBoundingClientRect();
+            const canvasRect = this.canvas.getBoundingClientRect();
+
+            const fromX = fromNode.x + fromRect.width; // Right side
+            const fromY = fromNode.y + fromRect.height / 2;
+            const toX = toNode.x; // Left side
+            const toY = toNode.y + toRect.height / 2;
+
+            // Create path with curve
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const midX = (fromX + toX) / 2;
+
+            path.setAttribute('d', `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`);
+            path.setAttribute('class', 'connection-line');
+            path.setAttribute('marker-end', 'url(#arrowhead)');
+
+            this.connectionsSvg.appendChild(path);
         }
 
         renderVariables() {
@@ -4021,20 +4070,84 @@
 
         // Placeholder methods for next task (connections)
         onConnectionDragStart(e, nodeId) {
-            // Will be implemented in next task (connections)
-            console.log('Connection drag start from node:', nodeId);
+            e.preventDefault();
+            e.stopPropagation();
+
+            this.isDraggingConnection = true;
+            this.connectionSourceId = nodeId;
+
+            // Create temp connection line
+            this.tempConnection = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            this.tempConnection.setAttribute('class', 'connection-line');
+            this.tempConnection.style.opacity = '0.5';
+            this.connectionsSvg.appendChild(this.tempConnection);
         }
 
         renderTempConnection(e) {
-            // Will be implemented in next task
+            if (!this.tempConnection || !this.connectionSourceId) return;
+
+            const fromNode = this.flowNodes.find(n => n.id === this.connectionSourceId);
+            if (!fromNode) return;
+
+            const fromEl = document.getElementById(this.connectionSourceId);
+            if (!fromEl) return;
+
+            const canvasRect = this.canvas.getBoundingClientRect();
+            const fromRect = fromEl.getBoundingClientRect();
+
+            const fromX = fromNode.x + fromRect.width;
+            const fromY = fromNode.y + fromRect.height / 2;
+            const toX = e.clientX - canvasRect.left;
+            const toY = e.clientY - canvasRect.top;
+
+            const midX = (fromX + toX) / 2;
+            this.tempConnection.setAttribute('d', `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`);
         }
 
         removeTempConnection() {
-            // Will be implemented in next task
+            if (this.tempConnection) {
+                this.tempConnection.remove();
+                this.tempConnection = null;
+            }
         }
 
         addConnection(fromId, toId) {
-            // Will be implemented in next task
+            // Check if connection already exists
+            const exists = this.flowConnections.some(c => c.from === fromId && c.to === toId);
+            if (exists) return;
+
+            // Check for circular connections
+            if (this.wouldCreateCycle(fromId, toId)) {
+                console.warn('Circular connection not allowed');
+                return;
+            }
+
+            this.flowConnections.push({ from: fromId, to: toId });
+            this.renderConnections();
+            this.saveFlow();
+        }
+
+        wouldCreateCycle(fromId, toId) {
+            // DFS to detect cycles
+            const visited = new Set();
+            const stack = [toId];
+
+            while (stack.length > 0) {
+                const current = stack.pop();
+                if (current === fromId) return true;
+
+                if (visited.has(current)) continue;
+                visited.add(current);
+
+                // Find all nodes that current connects to
+                const outgoing = this.flowConnections
+                    .filter(c => c.from === current)
+                    .map(c => c.to);
+
+                stack.push(...outgoing);
+            }
+
+            return false;
         }
 
         findNodeAtPosition(x, y) {
