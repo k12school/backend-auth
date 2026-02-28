@@ -224,6 +224,33 @@ public class UserRepositoryImpl implements UserRepository {
         return ctx.fetchCount(USERS);
     }
 
+    @Override
+    public Optional<User> findByEmailInTenant(String email, TenantId tenantId) {
+        DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        try {
+            UUID userId = ctx.select(USERS.ID)
+                    .from(USERS)
+                    .where(USERS.EMAIL.eq(email))
+                    .fetchOne(USERS.ID);
+            if (userId == null) {
+                return Optional.empty();
+            }
+            Optional<User> user = findById(new UserId(userId));
+            // Filter by tenant
+            if (user.isPresent() && user.get().tenantId().equals(tenantId)) {
+                return user;
+            }
+            return Optional.empty();
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public boolean existsByEmailInTenant(String email, TenantId tenantId) {
+        return findByEmailInTenant(email, tenantId).isPresent();
+    }
+
     /**
      * Load all events for a user from the event store.
      *
