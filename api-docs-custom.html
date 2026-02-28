@@ -3819,6 +3819,13 @@
             return String(value);
         }
 
+        escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         onEndpointDragStart(e) {
             e.dataTransfer.setData('application/json', JSON.stringify({
                 method: e.target.dataset.method,
@@ -4074,11 +4081,11 @@
                     <div class="config-section-title">Endpoint</div>
                     <div class="config-field">
                         <label>Method</label>
-                        <input type="text" value="${node.method}" readonly>
+                        <input type="text" value="${this.escapeHtml(node.method)}" readonly>
                     </div>
                     <div class="config-field">
                         <label>Path</label>
-                        <input type="text" value="${node.path}" readonly>
+                        <input type="text" value="${this.escapeHtml(node.path)}" readonly>
                     </div>
                 </div>
 
@@ -4164,7 +4171,7 @@
                 const saved = params.find(p => p.name === param.name);
                 return `
                     <div class="kv-row">
-                        <input type="text" value="${param.name}" readonly style="background: var(--bg-tertiary);">
+                        <input type="text" value="${this.escapeHtml(param.name)}" readonly style="background: var(--bg-tertiary);">
                         <input type="text"
                                placeholder="Value or {{variable}}"
                                value="${saved ? saved.value : ''}"
