@@ -3492,7 +3492,11 @@
             // Canvas state
             this.canvasOffset = { x: 0, y: 0 };
             this.isDraggingCanvas = false;
+            this.isDraggingNode = false;
+            this.isDraggingConnection = false;
             this.lastMousePos = { x: 0, y: 0 };
+            this.dragOffset = { x: 0, y: 0 };
+            this.connectionSourceId = null;
 
             // DOM elements
             this.canvas = null;
@@ -3568,6 +3572,24 @@
                 this.canvas.addEventListener('mousedown', (e) => this.onCanvasMouseDown(e));
                 this.canvas.addEventListener('mousemove', (e) => this.onCanvasMouseMove(e));
                 this.canvas.addEventListener('mouseup', (e) => this.onCanvasMouseUp(e));
+
+                // Canvas drop handler
+                this.canvas.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                });
+
+                this.canvas.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const data = e.dataTransfer.getData('application/json');
+                    if (data) {
+                        const endpoint = JSON.parse(data);
+                        const rect = this.canvas.getBoundingClientRect();
+                        const x = e.clientX - rect.left - 140; // Center horizontally
+                        const y = e.clientY - rect.top - 50; // Center vertically
+                        this.addNode(endpoint.method, endpoint.path, x, y);
+                    }
+                });
             }
         }
 
@@ -3630,8 +3652,75 @@
         }
 
         renderNodes() {
-            // Will be implemented in next task
-            console.log('Rendering nodes:', this.flowNodes.length);
+            if (!this.canvas) return;
+
+            // Remove existing node elements (keep svg)
+            const existingNodes = this.canvas.querySelectorAll('.flow-node');
+            existingNodes.forEach(n => n.remove());
+
+            // Render each node
+            this.flowNodes.forEach(node => {
+                const nodeEl = this.createNodeElement(node);
+                this.canvas.appendChild(nodeEl);
+            });
+        }
+
+        createNodeElement(node) {
+            const div = document.createElement('div');
+            div.className = 'flow-node';
+            div.id = node.id;
+            div.style.left = node.x + 'px';
+            div.style.top = node.y + 'px';
+
+            if (this.selectedNodeId === node.id) {
+                div.classList.add('selected');
+            }
+
+            // Status indicator
+            const statusClass = node.status || 'pending';
+            const statusText = this.getStatusText(node);
+
+            div.innerHTML = `
+                <div class="flow-node-connector input"></div>
+                <div class="flow-node-connector output"></div>
+                <div class="flow-node-header">
+                    <span class="flow-node-method ${node.method}">${node.method}</span>
+                    <span class="flow-node-path">${node.path}</span>
+                </div>
+                <div class="flow-node-body">
+                    <div class="flow-node-status ${statusClass}">
+                        <span>${statusText}</span>
+                    </div>
+                    ${node.config.extract && node.config.extract.length > 0 ?
+                        `<div class="flow-node-extract">
+                            Extracts: ${node.config.extract.map(e => e.as).join(', ')}
+                        </div>` : ''}
+                </div>
+                <div class="flow-node-actions">
+                    <button class="btn" onclick="app.apiConsole.testFlowManager.executeNode('${node.id}')">▶</button>
+                    <button class="btn btn-ghost" onclick="app.apiConsole.testFlowManager.selectNode('${node.id}')">⚙</button>
+                    <button class="btn btn-ghost" onclick="app.apiConsole.testFlowManager.deleteNode('${node.id}')">×</button>
+                </div>
+            `;
+
+            // Set up drag handlers
+            div.addEventListener('mousedown', (e) => this.onNodeMouseDown(e, node.id));
+
+            // Set up connection drag handlers
+            const outputConnector = div.querySelector('.flow-node-connector.output');
+            outputConnector.addEventListener('mousedown', (e) => this.onConnectionDragStart(e, node.id));
+
+            return div;
+        }
+
+        getStatusText(node) {
+            switch (node.status) {
+                case 'pending': return 'Ready';
+                case 'running': return 'Running...';
+                case 'success': return `✓ ${node.result?.status || 200} (${node.result?.time || 0}ms)`;
+                case 'error': return `✗ ${node.result?.error || 'Error'}`;
+                default: return 'Ready';
+            }
         }
 
         renderConnections() {
@@ -3762,10 +3851,127 @@
             console.log('Executing flow...');
         }
 
-        // Canvas event handlers (stubs)
-        onCanvasMouseDown(e) {}
-        onCanvasMouseMove(e) {}
-        onCanvasMouseUp(e) {}
+        deleteNode(nodeId) {
+            this.flowNodes = this.flowNodes.filter(n => n.id !== nodeId);
+            this.flowConnections = this.flowConnections.filter(c =>
+                c.from !== nodeId && c.to !== nodeId
+            );
+
+            this.renderNodes();
+            this.renderConnections();
+            this.saveFlow();
+
+            if (this.selectedNodeId === nodeId) {
+                this.deselectNode();
+            }
+        }
+
+        executeNode(nodeId) {
+            // Will be implemented in later tasks (flow execution)
+            console.log('Execute node:', nodeId);
+        }
+
+        // Node drag handlers
+        onNodeMouseDown(e, nodeId) {
+            // Don't drag if clicking on connector or button
+            if (e.target.classList.contains('flow-node-connector') ||
+                e.target.tagName === 'BUTTON') {
+                return;
+            }
+
+            this.draggedNodeId = nodeId;
+            this.isDraggingNode = true;
+
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            this.dragOffset = {
+                x: e.clientX - node.x,
+                y: e.clientY - node.y
+            };
+
+            e.preventDefault();
+        }
+
+        // Canvas event handlers
+        onCanvasMouseDown(e) {
+            // Start panning canvas
+            if (e.target === this.canvas) {
+                this.isDraggingCanvas = true;
+                this.lastMousePos = { x: e.clientX, y: e.clientY };
+                e.preventDefault();
+            }
+        }
+
+        onCanvasMouseMove(e) {
+            // Handle node dragging
+            if (this.isDraggingNode && this.draggedNodeId) {
+                const node = this.flowNodes.find(n => n.id === this.draggedNodeId);
+                if (node) {
+                    node.x = e.clientX - this.dragOffset.x;
+                    node.y = e.clientY - this.dragOffset.y;
+
+                    const nodeEl = document.getElementById(node.id);
+                    if (nodeEl) {
+                        nodeEl.style.left = node.x + 'px';
+                        nodeEl.style.top = node.y + 'px';
+                    }
+
+                    this.renderConnections();
+                }
+            }
+
+            // Handle canvas panning
+            if (this.isDraggingCanvas) {
+                const dx = e.clientX - this.lastMousePos.x;
+                const dy = e.clientY - this.lastMousePos.y;
+
+                // Update all node positions
+                this.flowNodes.forEach(node => {
+                    node.x += dx;
+                    node.y += dy;
+
+                    const nodeEl = document.getElementById(node.id);
+                    if (nodeEl) {
+                        nodeEl.style.left = node.x + 'px';
+                        nodeEl.style.top = node.y + 'px';
+                    }
+                });
+
+                this.lastMousePos = { x: e.clientX, y: e.clientY };
+                this.renderConnections();
+            }
+
+            // Handle connection dragging (placeholder for next task)
+            if (this.isDraggingConnection) {
+                this.renderTempConnection(e);
+            }
+        }
+
+        onCanvasMouseUp(e) {
+            // End node dragging
+            if (this.isDraggingNode) {
+                this.isDraggingNode = false;
+                this.draggedNodeId = null;
+                this.saveFlow();
+            }
+
+            // End canvas panning
+            if (this.isDraggingCanvas) {
+                this.isDraggingCanvas = false;
+            }
+
+            // End connection dragging (placeholder for next task)
+            if (this.isDraggingConnection) {
+                const targetNode = this.findNodeAtPosition(e.clientX, e.clientY);
+                if (targetNode && targetNode.id !== this.connectionSourceId) {
+                    this.addConnection(this.connectionSourceId, targetNode.id);
+                }
+                this.isDraggingConnection = false;
+                this.connectionSourceId = null;
+                this.removeTempConnection();
+            }
+        }
 
         // Node selection
         selectNode(nodeId) {
@@ -3783,6 +3989,45 @@
         renderNodeConfig(nodeId) {
             // Will be implemented in next task
             console.log('Render config for node:', nodeId);
+        }
+
+        // Placeholder methods for next task (connections)
+        onConnectionDragStart(e, nodeId) {
+            // Will be implemented in next task (connections)
+            console.log('Connection drag start from node:', nodeId);
+        }
+
+        renderTempConnection(e) {
+            // Will be implemented in next task
+        }
+
+        removeTempConnection() {
+            // Will be implemented in next task
+        }
+
+        addConnection(fromId, toId) {
+            // Will be implemented in next task
+        }
+
+        findNodeAtPosition(x, y) {
+            const canvasRect = this.canvas.getBoundingClientRect();
+            const canvasX = x - canvasRect.left;
+            const canvasY = y - canvasRect.top;
+
+            // Check each node (reverse to find top-most)
+            for (let i = this.flowNodes.length - 1; i >= 0; i--) {
+                const node = this.flowNodes[i];
+                const nodeEl = document.getElementById(node.id);
+                if (!nodeEl) continue;
+
+                const rect = nodeEl.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right &&
+                    y >= rect.top && y <= rect.bottom) {
+                    return node;
+                }
+            }
+
+            return null;
         }
 
         filterEndpoints(query) {
