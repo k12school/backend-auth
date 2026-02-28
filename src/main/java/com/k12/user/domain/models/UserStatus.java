@@ -12,5 +12,10 @@ public enum UserStatus {
     /**
      * User cannot login.
      */
-    SUSPENDED
+    SUSPENDED,
+
+    /**
+     * User has been soft deleted and should not appear in queries.
+     */
+    DELETED
 }

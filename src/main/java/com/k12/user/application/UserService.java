@@ -254,7 +254,17 @@ public class UserService {
     }
 
     public Result<Void, UserError> softDeleteUser(UserId id) {
-        // TODO: Implement
-        return Result.failure(UserError.PersistenceError.STORAGE_ERROR);
+        var userResult = userRepository.findById(id);
+        if (userResult.isEmpty()) {
+            return Result.failure(UserError.NotFoundError.USER_NOT_FOUND);
+        }
+
+        var user = userResult.get();
+
+        // Soft delete by updating status to DELETED
+        var deletedUser = user.withStatus(com.k12.user.domain.models.UserStatus.DELETED);
+        userRepository.save(deletedUser);
+
+        return Result.success(null);
     }
 }
