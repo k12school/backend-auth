@@ -3569,9 +3569,17 @@
 
             // Canvas drag (for panning)
             if (this.canvas) {
-                this.canvas.addEventListener('mousedown', (e) => this.onCanvasMouseDown(e));
-                this.canvas.addEventListener('mousemove', (e) => this.onCanvasMouseMove(e));
-                this.canvas.addEventListener('mouseup', (e) => this.onCanvasMouseUp(e));
+                // Bind event handlers for proper cleanup
+                this.boundOnCanvasMouseDown = this.onCanvasMouseDown.bind(this);
+                this.boundOnCanvasMouseMove = this.onCanvasMouseMove.bind(this);
+                this.boundOnCanvasMouseUp = this.onCanvasMouseUp.bind(this);
+
+                // Canvas mouse down listener (stays on canvas)
+                this.canvas.addEventListener('mousedown', this.boundOnCanvasMouseDown);
+
+                // Mouse move and up listeners on window for better drag handling
+                window.addEventListener('mousemove', this.boundOnCanvasMouseMove);
+                window.addEventListener('mouseup', this.boundOnCanvasMouseUp);
 
                 // Canvas drop handler
                 this.canvas.addEventListener('dragover', (e) => {
@@ -3708,7 +3716,9 @@
 
             // Set up connection drag handlers
             const outputConnector = div.querySelector('.flow-node-connector.output');
-            outputConnector.addEventListener('mousedown', (e) => this.onConnectionDragStart(e, node.id));
+            if (outputConnector) {
+                outputConnector.addEventListener('mousedown', (e) => this.onConnectionDragStart(e, node.id));
+            }
 
             return div;
         }
@@ -3890,6 +3900,12 @@
                 y: e.clientY - node.y
             };
 
+            // Add dragging class for visual feedback
+            const nodeEl = document.getElementById(nodeId);
+            if (nodeEl) {
+                nodeEl.classList.add('dragging');
+            }
+
             e.preventDefault();
         }
 
@@ -3908,8 +3924,14 @@
             if (this.isDraggingNode && this.draggedNodeId) {
                 const node = this.flowNodes.find(n => n.id === this.draggedNodeId);
                 if (node) {
-                    node.x = e.clientX - this.dragOffset.x;
-                    node.y = e.clientY - this.dragOffset.y;
+                    // Get canvas bounds for boundary checking
+                    const canvasRect = this.canvas.getBoundingClientRect();
+                    const max_x = canvasRect.width - 280; // node width
+                    const max_y = canvasRect.height - 150; // approximate node height
+
+                    // Apply boundary checking
+                    node.x = Math.max(0, Math.min(max_x, e.clientX - this.dragOffset.x));
+                    node.y = Math.max(0, Math.min(max_y, e.clientY - this.dragOffset.y));
 
                     const nodeEl = document.getElementById(node.id);
                     if (nodeEl) {
@@ -3926,10 +3948,10 @@
                 const dx = e.clientX - this.lastMousePos.x;
                 const dy = e.clientY - this.lastMousePos.y;
 
-                // Update all node positions
+                // Update all node positions with boundary checking
                 this.flowNodes.forEach(node => {
-                    node.x += dx;
-                    node.y += dy;
+                    node.x = Math.max(0, node.x + dx);
+                    node.y = Math.max(0, node.y + dy);
 
                     const nodeEl = document.getElementById(node.id);
                     if (nodeEl) {
@@ -3951,6 +3973,12 @@
         onCanvasMouseUp(e) {
             // End node dragging
             if (this.isDraggingNode) {
+                // Remove dragging class
+                const nodeEl = document.getElementById(this.draggedNodeId);
+                if (nodeEl) {
+                    nodeEl.classList.remove('dragging');
+                }
+
                 this.isDraggingNode = false;
                 this.draggedNodeId = null;
                 this.saveFlow();
@@ -4040,6 +4068,33 @@
                 const match = path.includes(q) || method.includes(q);
                 item.style.display = match ? 'flex' : 'none';
             });
+        }
+
+        /**
+         * Cleanup method to remove event listeners and prevent memory leaks
+         */
+        cleanup() {
+            // Remove window listeners
+            if (this.boundOnCanvasMouseMove) {
+                window.removeEventListener('mousemove', this.boundOnCanvasMouseMove);
+            }
+            if (this.boundOnCanvasMouseUp) {
+                window.removeEventListener('mouseup', this.boundOnCanvasMouseUp);
+            }
+
+            // Remove canvas listener
+            if (this.canvas && this.boundOnCanvasMouseDown) {
+                this.canvas.removeEventListener('mousedown', this.boundOnCanvasMouseDown);
+            }
+
+            // Clear state
+            this.flowNodes = [];
+            this.flowConnections = [];
+            this.isDraggingNode = false;
+            this.isDraggingCanvas = false;
+            this.isDraggingConnection = false;
+            this.draggedNodeId = null;
+            this.connectionSourceId = null;
         }
     }
 
