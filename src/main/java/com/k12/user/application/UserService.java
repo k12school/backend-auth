@@ -12,16 +12,17 @@ import com.k12.user.domain.ports.out.ParentRepository;
 import com.k12.user.domain.ports.out.StudentRepository;
 import com.k12.user.domain.ports.out.TeacherRepository;
 import com.k12.user.domain.ports.out.UserRepository;
-import com.k12.user.infrastructure.persistence.TransactionalContext;
 import com.k12.user.infrastructure.rest.dto.ChangeRoleRequest;
 import com.k12.user.infrastructure.rest.dto.CreateUserRequest;
 import com.k12.user.infrastructure.rest.dto.UpdateUserRequest;
 import com.k12.user.infrastructure.rest.dto.UserResponse;
+import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.transaction.Transactional;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
 
 @ApplicationScoped
 @RequiredArgsConstructor
@@ -38,55 +39,62 @@ public class UserService {
     private final ParentRepository parentRepository;
     private final StudentRepository studentRepository;
     private final AdminRepository adminRepository;
-    private final TransactionalContext transactionalContext;
+    private final AgroalDataSource dataSource;
 
-    @Transactional
     public Result<UserResponse, UserError> createUser(CreateUserRequest request) {
-        // Get shared transaction context
-        DSLContext ctx = transactionalContext.getContext();
+        // Use jOOQ transaction to ensure all operations use the same connection
+        DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
-        // Check email uniqueness
-        var existingUser = userRepository.findByEmailAddress(request.email());
-        if (existingUser.isPresent()) {
-            return Result.failure(UserError.ConflictError.EMAIL_ALREADY_EXISTS);
+        try {
+            return ctx.transactionResult(() -> {
+                // Check email uniqueness
+                var existingUser = userRepository.findByEmailAddress(request.email());
+                if (existingUser.isPresent()) {
+                    throw new UserCreationException(UserError.ConflictError.EMAIL_ALREADY_EXISTS);
+                }
+
+                // Hash password
+                String passwordHash = com.k12.user.infrastructure.security.PasswordHasher.hash(request.password())
+                        .value();
+
+                // Create base User via UserFactory
+                var tenantId = new TenantId(DEFAULT_TENANT_ID);
+                var userId = UserId.generate();
+
+                var userResult = com.k12.user.domain.models.UserFactory.create(
+                        com.k12.user.domain.models.EmailAddress.of(request.email()),
+                        new com.k12.user.domain.models.PasswordHash(passwordHash),
+                        java.util.Set.of(com.k12.user.domain.models.UserRole.valueOf(
+                                request.role().value())),
+                        com.k12.user.domain.models.UserName.of(request.name()),
+                        tenantId);
+
+                if (userResult.isFailure()) {
+                    throw new UserCreationException(userResult.getError());
+                }
+
+                var userCreatedEvent = userResult.get();
+                var user = com.k12.user.domain.models.UserReconstructor.applyEvent(null, userCreatedEvent);
+
+                // Save user using the transactional context
+                userRepository.save(user, ctx);
+
+                // Create specialization based on role using the same context
+                switch (request.role().value()) {
+                    case "TEACHER" -> createTeacher(userId, request.teacherData(), ctx);
+                    case "PARENT" -> createParent(userId, request.parentData(), ctx);
+                    case "STUDENT" -> createStudent(userId, request.studentData(), ctx);
+                    case "ADMIN" -> createAdmin(userId, ctx);
+                }
+
+                // Build response
+                return Result.success(buildUserResponse(user, request));
+            });
+        } catch (UserCreationException e) {
+            return Result.failure(e.error);
+        } catch (Exception e) {
+            return Result.failure(UserError.PersistenceError.SAVE_FAILED);
         }
-
-        // Hash password
-        String passwordHash = com.k12.user.infrastructure.security.PasswordHasher.hash(request.password())
-                .value();
-
-        // Create base User via UserFactory
-        var tenantId = new TenantId(DEFAULT_TENANT_ID);
-        var userId = UserId.generate();
-
-        var userResult = com.k12.user.domain.models.UserFactory.create(
-                com.k12.user.domain.models.EmailAddress.of(request.email()),
-                new com.k12.user.domain.models.PasswordHash(passwordHash),
-                java.util.Set.of(com.k12.user.domain.models.UserRole.valueOf(
-                        request.role().value())),
-                com.k12.user.domain.models.UserName.of(request.name()),
-                tenantId);
-
-        if (userResult.isFailure()) {
-            return Result.failure(userResult.getError());
-        }
-
-        var userCreatedEvent = userResult.get();
-        var user = com.k12.user.domain.models.UserReconstructor.applyEvent(null, userCreatedEvent);
-
-        // Save user FIRST (required for foreign key constraints)
-        userRepository.save(user, ctx);
-
-        // Create specialization based on role (user must exist first)
-        switch (request.role().value()) {
-            case "TEACHER" -> createTeacher(userId, request.teacherData(), ctx);
-            case "PARENT" -> createParent(userId, request.parentData(), ctx);
-            case "STUDENT" -> createStudent(userId, request.studentData(), ctx);
-            case "ADMIN" -> createAdmin(userId, ctx);
-        }
-
-        // Build response
-        return Result.success(buildUserResponse(user, request));
     }
 
     private void createTeacher(UserId userId, CreateUserRequest.TeacherData data, DSLContext ctx) {
@@ -274,5 +282,14 @@ public class UserService {
         userRepository.save(deletedUser);
 
         return Result.success(null);
+    }
+
+    private static class UserCreationException extends RuntimeException {
+        final UserError error;
+
+        UserCreationException(UserError error) {
+            super(error.toString());
+            this.error = error;
+        }
     }
 }

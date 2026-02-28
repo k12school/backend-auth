@@ -15,14 +15,13 @@ import com.k12.user.domain.ports.out.ParentRepository;
 import com.k12.user.domain.ports.out.StudentRepository;
 import com.k12.user.domain.ports.out.TeacherRepository;
 import com.k12.user.domain.ports.out.UserRepository;
-import com.k12.user.infrastructure.persistence.TransactionalContext;
 import com.k12.user.infrastructure.rest.dto.CreateUserRequest;
 import com.k12.user.infrastructure.rest.dto.UserResponse;
+import io.agroal.api.AgroalDataSource;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.Set;
-import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +32,7 @@ class UserServiceTest {
     private ParentRepository parentRepository;
     private StudentRepository studentRepository;
     private AdminRepository adminRepository;
-    private TransactionalContext transactionalContext;
+    private AgroalDataSource dataSource;
     private UserService userService;
 
     @BeforeEach
@@ -43,16 +42,9 @@ class UserServiceTest {
         parentRepository = mock(ParentRepository.class);
         studentRepository = mock(StudentRepository.class);
         adminRepository = mock(AdminRepository.class);
-        transactionalContext = mock(TransactionalContext.class);
-        DSLContext mockCtx = mock(DSLContext.class);
-        when(transactionalContext.getContext()).thenReturn(mockCtx);
+        dataSource = mock(AgroalDataSource.class);
         userService = new UserService(
-                userRepository,
-                teacherRepository,
-                parentRepository,
-                studentRepository,
-                adminRepository,
-                transactionalContext);
+                userRepository, teacherRepository, parentRepository, studentRepository, adminRepository, dataSource);
     }
 
     @Test
@@ -68,8 +60,7 @@ class UserServiceTest {
                 null);
 
         when(userRepository.findByEmailAddress("teacher@example.com")).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class), any(DSLContext.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
         var result = userService.createUser(request);
@@ -85,8 +76,8 @@ class UserServiceTest {
         assertEquals("2020-08-15", response.teacher().hireDate());
 
         verify(userRepository).findByEmailAddress("teacher@example.com");
-        verify(userRepository).save(any(User.class), any(DSLContext.class));
-        verify(teacherRepository).save(any(), any(DSLContext.class));
+        verify(userRepository).save(any(User.class));
+        verify(teacherRepository).save(any());
     }
 
     @Test
@@ -129,8 +120,7 @@ class UserServiceTest {
                 null);
 
         when(userRepository.findByEmailAddress("parent@example.com")).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class), any(DSLContext.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
         var result = userService.createUser(request);
@@ -146,8 +136,8 @@ class UserServiceTest {
         assertEquals("Emergency Contact", response.parent().emergencyContact());
 
         verify(userRepository).findByEmailAddress("parent@example.com");
-        verify(userRepository).save(any(User.class), any(DSLContext.class));
-        verify(parentRepository).save(any(), any(DSLContext.class));
+        verify(userRepository).save(any(User.class));
+        verify(parentRepository).save(any());
     }
 
     @Test
@@ -163,8 +153,7 @@ class UserServiceTest {
                 new CreateUserRequest.StudentData("STU001", "GRADE_10", "2010-05-15", null));
 
         when(userRepository.findByEmailAddress("student@example.com")).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class), any(DSLContext.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
         var result = userService.createUser(request);
@@ -181,8 +170,8 @@ class UserServiceTest {
         assertNull(response.student().guardianId());
 
         verify(userRepository).findByEmailAddress("student@example.com");
-        verify(userRepository).save(any(User.class), any(DSLContext.class));
-        verify(studentRepository).save(any(), any(DSLContext.class));
+        verify(userRepository).save(any(User.class));
+        verify(studentRepository).save(any());
     }
 
     @Test
@@ -198,8 +187,7 @@ class UserServiceTest {
                 null);
 
         when(userRepository.findByEmailAddress("admin@example.com")).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class), any(DSLContext.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
         var result = userService.createUser(request);
@@ -213,8 +201,8 @@ class UserServiceTest {
         // Admin specialization data is not returned in UserResponse
 
         verify(userRepository).findByEmailAddress("admin@example.com");
-        verify(userRepository).save(any(User.class), any(DSLContext.class));
-        verify(adminRepository).save(any(), any(DSLContext.class));
+        verify(userRepository).save(any(User.class));
+        verify(adminRepository).save(any());
     }
 
     @Test
