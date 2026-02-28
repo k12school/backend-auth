@@ -3991,9 +3991,101 @@
             this.renderVariables();
         }
 
-        executeFlow() {
-            // Will be implemented in later tasks
-            console.log('Executing flow...');
+        async executeFlow() {
+            if (this.flowNodes.length === 0) {
+                this.eventBus.emit('ui:notification', {
+                    message: 'No nodes to execute'
+                });
+                return;
+            }
+
+            // Build execution order from connections
+            const executionOrder = this.buildExecutionOrder();
+
+            if (executionOrder.length === 0) {
+                // Execute all nodes if no connections
+                executionOrder.push(...this.flowNodes.map(n => n.id));
+            }
+
+            // Reset all node statuses
+            this.flowNodes.forEach(node => {
+                node.status = 'pending';
+                node.result = null;
+            });
+            this.renderNodes();
+
+            // Clear variables before execution
+            this.flowVariables = {};
+            this.renderVariables();
+
+            // Execute nodes in order
+            const variables = {};
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const nodeId of executionOrder) {
+                const result = await this.executeNode(nodeId, variables);
+
+                if (result.success) {
+                    successCount++;
+                    // Extracted variables are automatically added to flowVariables
+                    // Update local variables for next node
+                    Object.keys(this.flowVariables).forEach(varName => {
+                        variables[varName] = this.flowVariables[varName].value;
+                    });
+                } else {
+                    errorCount++;
+                    // Stop on error
+                    break;
+                }
+            }
+
+            // Show notification
+            this.eventBus.emit('ui:notification', {
+                message: `Flow completed: ${successCount} success, ${errorCount} errors`
+            });
+        }
+
+        buildExecutionOrder() {
+            // Topological sort based on connections
+            const order = [];
+            const visited = new Set();
+            const visiting = new Set();
+
+            const visit = (nodeId) => {
+                if (visited.has(nodeId)) return;
+                if (visiting.has(nodeId)) {
+                    console.warn('Circular dependency detected:', nodeId);
+                    return;
+                }
+
+                visiting.add(nodeId);
+
+                // Visit dependencies first (nodes that connect to this one)
+                const dependencies = this.flowConnections
+                    .filter(c => c.to === nodeId)
+                    .map(c => c.from);
+
+                dependencies.forEach(depId => visit(depId));
+
+                visiting.delete(nodeId);
+                visited.add(nodeId);
+                order.push(nodeId);
+            };
+
+            // Start from nodes with no incoming connections
+            const hasIncoming = new Set(
+                this.flowConnections.map(c => c.to)
+            );
+
+            this.flowNodes
+                .filter(node => !hasIncoming.has(node.id))
+                .forEach(node => visit(node.id));
+
+            // Visit remaining nodes
+            this.flowNodes.forEach(node => visit(node.id));
+
+            return order;
         }
 
         deleteNode(nodeId) {
@@ -4011,9 +4103,150 @@
             }
         }
 
-        executeNode(nodeId) {
-            // Will be implemented in later tasks (flow execution)
-            console.log('Execute node:', nodeId);
+        async executeNode(nodeId, variables = {}) {
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            // Update node status
+            node.status = 'running';
+            this.renderNodes();
+
+            try {
+                // Build request with substituted variables
+                const request = this.buildNodeRequest(node, variables);
+
+                // Execute request
+                const startTime = Date.now();
+                const response = await this.executeRequest(request);
+                const duration = Date.now() - startTime;
+
+                // Parse response
+                let responseData;
+                try {
+                    responseData = await response.json();
+                } catch {
+                    responseData = await response.text();
+                }
+
+                // Update node with result
+                node.status = response.ok ? 'success' : 'error';
+                node.result = {
+                    status: response.status,
+                    time: duration,
+                    data: responseData
+                };
+
+                // Extract variables from response
+                if (response.ok) {
+                    this.extractVariables(node, responseData);
+                }
+
+                this.renderNodes();
+                this.renderVariables();
+
+                return {
+                    success: response.ok,
+                    data: responseData,
+                    node: node
+                };
+
+            } catch (error) {
+                node.status = 'error';
+                node.result = {
+                    error: error.message
+                };
+
+                this.renderNodes();
+
+                return {
+                    success: false,
+                    error: error.message,
+                    node: node
+                };
+            }
+        }
+
+        buildNodeRequest(node, variables = {}) {
+            const config = node.config;
+
+            // Substitute variables in path
+            let url = this.substituteVariables(node.path, variables);
+
+            // Replace path parameters
+            if (config.pathParams) {
+                config.pathParams.forEach(param => {
+                    const value = this.substituteVariables(param.value, variables);
+                    url = url.replace(`{${param.name}}`, encodeURIComponent(value));
+                });
+            }
+
+            // Build query parameters
+            const queryParams = [];
+            if (config.queryParams) {
+                config.queryParams.forEach(param => {
+                    if (param.key) {
+                        const value = this.substituteVariables(param.value, variables);
+                        if (value !== '') {
+                            queryParams.push(`${encodeURIComponent(param.key)}=${encodeURIComponent(value)}`);
+                        }
+                    }
+                });
+            }
+
+            if (queryParams.length > 0) {
+                url += '?' + queryParams.join('&');
+            }
+
+            // Build headers
+            const headers = {};
+            if (config.headers) {
+                config.headers.forEach(header => {
+                    if (header.key) {
+                        headers[header.key] = this.substituteVariables(header.value, variables);
+                    }
+                });
+            }
+
+            // Add auth header if token exists
+            if (this.flowVariables.auth_token) {
+                headers['Authorization'] = `Bearer ${this.flowVariables.auth_token.value}`;
+            }
+
+            // Build body
+            let body = null;
+            if (config.body && ['POST', 'PUT', 'PATCH'].includes(node.method)) {
+                try {
+                    const bodyObj = JSON.parse(config.body);
+                    const substitutedBody = this.substituteInObject(bodyObj, variables);
+                    body = JSON.stringify(substitutedBody);
+                } catch {
+                    // Not JSON, substitute as string
+                    body = this.substituteVariables(config.body, variables);
+                }
+            }
+
+            return {
+                method: node.method,
+                url: url,
+                headers: headers,
+                body: body
+            };
+        }
+
+        async executeRequest(request) {
+            const options = {
+                method: request.method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...request.headers
+                }
+            };
+
+            if (request.body) {
+                options.body = request.body;
+            }
+
+            return await fetch(request.url, options);
         }
 
         // Node drag handlers
