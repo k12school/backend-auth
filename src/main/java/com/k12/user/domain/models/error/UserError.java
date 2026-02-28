@@ -9,7 +9,15 @@ public sealed interface UserError
                 UserError.PasswordError,
                 UserError.RoleError,
                 UserError.NameError,
-                UserError.ValidationError {
+                UserError.ValidationError,
+                UserError.NotFoundError,
+                UserError.ConflictError,
+                UserError.PersistenceError {
+
+    /**
+     * Returns the error message.
+     */
+    String message();
 
     /**
      * Errors related to user status operations.
@@ -124,6 +132,65 @@ public sealed interface UserError
             this.message = message;
         }
 
+        @Override
+        public String message() {
+            return message;
+        }
+    }
+
+    /**
+     * Errors when a requested resource is not found.
+     */
+    enum NotFoundError implements UserError {
+        USER_NOT_FOUND("User not found"),
+        USER_ALREADY_DELETED("User has already been deleted");
+
+        private final String message;
+
+        NotFoundError(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public String message() {
+            return message;
+        }
+    }
+
+    /**
+     * Conflict errors (business rule violations).
+     */
+    enum ConflictError implements UserError {
+        EMAIL_ALREADY_EXISTS("Email already exists"),
+        USER_ALREADY_EXISTS("User already exists");
+
+        private final String message;
+
+        ConflictError(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public String message() {
+            return message;
+        }
+    }
+
+    /**
+     * Persistence layer errors.
+     */
+    enum PersistenceError implements UserError {
+        STORAGE_ERROR("Error storing or retrieving user data"),
+        CONNECTION_ERROR("Database connection error"),
+        SAVE_FAILED("Failed to save user");
+
+        private final String message;
+
+        PersistenceError(String message) {
+            this.message = message;
+        }
+
+        @Override
         public String message() {
             return message;
         }
