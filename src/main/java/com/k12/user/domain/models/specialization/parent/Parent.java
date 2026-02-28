@@ -2,11 +2,8 @@ package com.k12.user.domain.models.specialization.parent;
 
 import java.time.Instant;
 
-/**
- * Aggregate root representing a Parent in the system.
- * TODO: Implement full parent domain model with event sourcing
- */
-public record Parent(ParentId parentId, Instant createdAt) {
+public record Parent(
+        ParentId parentId, String phoneNumber, String address, String emergencyContact, Instant createdAt) {
 
     public Parent {
         if (parentId == null) {
