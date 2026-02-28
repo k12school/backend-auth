@@ -201,16 +201,6 @@
             margin-bottom: 12px;
         }
 
-        .search-input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 14px;
-        }
-
         .endpoint-library {
             flex: 1;
             overflow-y: auto;
@@ -1671,10 +1661,9 @@
                     <div class="flow-sidebar">
                         <div class="sidebar-header">
                             <h3>Endpoints</h3>
-                            <input type="text" id="endpoint-search" placeholder="Search..." class="search-input">
                         </div>
                         <div id="endpoint-library" class="endpoint-library">
-                            <!-- Endpoints will be populated here -->
+                            <!-- Endpoints will be populated here grouped by tag -->
                         </div>
                     </div>
 
@@ -3170,7 +3159,7 @@
 
         async init() {
             try {
-                // Fetch OpenAPI spec
+                // Fetch OpenAPI spec (may fail, that's ok)
                 await this.fetchOpenAPISpec();
 
                 // Get docs panel element
@@ -3189,6 +3178,12 @@
 
                 // Subscribe to events
                 this.subscribeToEvents();
+
+                // Extract all endpoints from DOM for TestFlowManager
+                // Wait a bit for Redoc to finish rendering
+                setTimeout(() => {
+                    this.extractAllEndpointsFromDOM();
+                }, 1000);
             } catch (error) {
                 console.error('RedocIntegrator initialization failed:', error);
             }
@@ -3210,6 +3205,118 @@
                 console.error('Failed to fetch OpenAPI spec:', error);
                 this.openAPISpec = null;
             }
+        }
+
+        extractAllEndpointsForTestFlow() {
+            if (!this.openAPISpec || !this.openAPISpec.paths) {
+                console.warn('OpenAPI spec not available, cannot extract endpoints');
+                return;
+            }
+
+            const endpoints = [];
+            const paths = this.openAPISpec.paths;
+
+            // Iterate through all paths and methods
+            Object.keys(paths).forEach(path => {
+                const pathItem = paths[path];
+
+                // Check each HTTP method
+                ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'].forEach(method => {
+                    if (pathItem[method]) {
+                        const operation = pathItem[method];
+
+                        // Get tags (default to 'Other' if no tags)
+                        const tags = operation.tags && operation.tags.length > 0
+                            ? operation.tags
+                            : ['Other'];
+
+                        // Add endpoint for each tag
+                        tags.forEach(tag => {
+                            endpoints.push({
+                                method: method.toUpperCase(),
+                                path: path,
+                                tag: tag.replace(/-/g, ' ')
+                            });
+                        });
+                    }
+                });
+            });
+
+            // Store all endpoints to StateManager
+            this.stateManager.set('endpoints', endpoints);
+
+            console.log(`Extracted ${endpoints.length} endpoints for TestFlow`, endpoints);
+
+            // Notify TestFlowManager to refresh
+            this.eventBus.emit('testflow:endpoints_updated');
+        }
+
+        extractAllEndpointsFromDOM() {
+            const endpoints = [];
+            const processedEndpoints = new Set(); // To avoid duplicates
+
+            // Find all elements with data-section-id attribute
+            const endpointElements = this.docsPanel.querySelectorAll('[data-section-id]');
+
+            console.log(`Scanning ${endpointElements.length} elements for endpoints...`);
+
+            endpointElements.forEach(element => {
+                const sectionId = element.getAttribute('data-section-id');
+
+                // Check if this is an endpoint section (contains /paths/)
+                if (sectionId && sectionId.includes('/paths/')) {
+                    try {
+                        // Parse sectionId: "tag/Authentication/paths/~1api~1auth~1login/post"
+                        const parts = sectionId.split('/');
+
+                        // Find the method part (last part)
+                        const method = parts[parts.length - 1].toUpperCase();
+
+                        // Find the encoded path part
+                        const pathPartIndex = parts.findIndex(p => p === 'paths');
+                        if (pathPartIndex !== -1 && pathPartIndex + 1 < parts.length) {
+                            const encodedPath = parts[pathPartIndex + 1];
+
+                            // Decode the path (replace ~1 with /, ~0 with ~)
+                            // Note: encodedPath already includes the leading / as ~1
+                            let path = encodedPath.replace(/~1/g, '/').replace(/~0/g, '~');
+
+                            // Ensure path starts with / (in case it's an empty path)
+                            if (!path.startsWith('/')) {
+                                path = '/' + path;
+                            }
+
+                            // Create unique key for deduplication
+                            const endpointKey = `${method}:${path}`;
+
+                            if (!processedEndpoints.has(endpointKey)) {
+                                processedEndpoints.add(endpointKey);
+
+                                // Extract tag from sectionId
+                                const tag = this.extractTagFromSectionId(sectionId);
+
+                                endpoints.push({
+                                    method,
+                                    path,
+                                    tag
+                                });
+
+                                console.log('Found endpoint:', { method, path, tag });
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Failed to parse endpoint from sectionId:', sectionId, error);
+                    }
+                }
+            });
+
+            // Store all endpoints to StateManager
+            this.stateManager.set('endpoints', endpoints);
+
+            console.log(`Extracted ${endpoints.length} unique endpoints from DOM for TestFlow`);
+
+            // Notify TestFlowManager to refresh
+            this.eventBus.emit('testflow:endpoints_updated');
         }
 
         attachInterceptors() {
@@ -3357,6 +3464,13 @@
             }
 
             console.log('Extracted endpoint:', { method, path, encodedPath, sectionId });
+
+            // Store endpoint for TestFlowManager
+            try {
+                this.storeEndpointForTestFlow(method, path, sectionId);
+            } catch (error) {
+                console.error('Error storing endpoint for TestFlow:', error);
+            }
 
             // Look up endpoint details in OpenAPI spec
             const endpointDetails = this.getEndpointDetailsFromSpec(method, path);
@@ -3666,6 +3780,33 @@
             return match ? match[1].replace(/-/g, ' ') : 'Other';
         }
 
+        storeEndpointForTestFlow(method, path, sectionId) {
+            // Get or create endpoints array
+            const endpoints = this.stateManager.get('endpoints') || [];
+
+            console.log('storeEndpointForTestFlow called:', { method, path, sectionId, existingEndpoints: endpoints.length });
+
+            // Check if endpoint already exists
+            const endpointExists = endpoints.some(ep => ep.method === method && ep.path === path);
+            if (!endpointExists) {
+                // Extract tag from sectionId
+                const tag = this.extractTagFromSectionId(sectionId);
+
+                // Add endpoint
+                endpoints.push({ method, path, tag });
+
+                // Store back to StateManager
+                this.stateManager.set('endpoints', endpoints);
+
+                // Notify TestFlowManager to refresh
+                this.eventBus.emit('testflow:endpoints_updated');
+
+                console.log('Stored endpoint for TestFlow:', { method, path, tag });
+            } else {
+                console.log('Endpoint already exists, skipping:', { method, path });
+            }
+        }
+
         destroy() {
             // Clear highlight timeout to prevent orphaned callbacks
             if (this.highlightTimeout) {
@@ -3726,19 +3867,34 @@
         }
 
         init() {
+            console.log('[TestFlow] Initializing TestFlowManager...');
+
             // Cache DOM elements
             this.canvas = document.getElementById('flow-canvas');
             this.connectionsSvg = document.getElementById('flow-connections');
             this.endpointLibrary = document.getElementById('endpoint-library');
             this.configContent = document.getElementById('node-config-content');
 
+            console.log('[TestFlow] DOM elements cached:', {
+                canvas: !!this.canvas,
+                connectionsSvg: !!this.connectionsSvg,
+                endpointLibrary: !!this.endpointLibrary,
+                configContent: !!this.configContent
+            });
+
             // Set up event listeners
             this.setupEventListeners();
+
+            // Listen for endpoint updates from RedocIntegrator
+            this.eventBus.on('testflow:endpoints_updated', () => {
+                console.log('[TestFlow] endpoints_updated event received, refreshing endpoint library');
+                this.renderEndpointLibrary();
+            });
 
             // Load saved flow or create empty
             this.loadFlow();
 
-            console.log('TestFlowManager initialized');
+            console.log('[TestFlow] TestFlowManager initialized successfully');
         }
 
         setupEventListeners() {
@@ -3795,12 +3951,6 @@
                 closeConfigBtn.addEventListener('click', () => this.deselectNode());
             }
 
-            // Search input
-            const searchInput = document.getElementById('endpoint-search');
-            if (searchInput) {
-                searchInput.addEventListener('input', (e) => this.filterEndpoints(e.target.value));
-            }
-
             // Canvas drag (for panning)
             if (this.canvas) {
                 // Bind event handlers for proper cleanup
@@ -3836,11 +3986,19 @@
         }
 
         showPanel() {
+            console.log('[TestFlow] Showing Test Flow panel');
+
             // Hide try panel, show test flow panel
             document.getElementById('try-panel').style.display = 'none';
             document.getElementById('test-flow-panel').style.display = 'flex';
 
             // Render endpoint library and nodes
+            console.log('[TestFlow] Rendering flow state:', {
+                nodes: this.flowNodes.length,
+                connections: this.flowConnections.length,
+                variables: Object.keys(this.flowVariables).length
+            });
+
             this.renderEndpointLibrary();
             this.renderNodes();
             this.renderConnections();
@@ -3848,6 +4006,7 @@
         }
 
         hidePanel() {
+            console.log('[TestFlow] Hiding Test Flow panel');
             document.getElementById('test-flow-panel').style.display = 'none';
             document.getElementById('try-panel').style.display = 'flex';
         }
@@ -3857,6 +4016,8 @@
 
             // Get all endpoints from the state
             const endpoints = this.stateManager.get('endpoints') || [];
+
+            console.log('renderEndpointLibrary called with endpoints:', endpoints);
 
             // Group by tag
             const grouped = {};
@@ -3946,14 +4107,39 @@
                         `<div class="flow-node-error">${node.result.error}</div>` : ''}
                 </div>
                 <div class="flow-node-actions">
-                    <button class="btn" onclick="app.apiConsole.testFlowManager.executeNode('${node.id}')" title="Execute this node">▶</button>
-                    <button class="btn btn-ghost" onclick="app.apiConsole.testFlowManager.selectNode('${node.id}')" title="Configure node">⚙</button>
-                    <button class="btn btn-ghost" onclick="app.apiConsole.testFlowManager.deleteNode('${node.id}')" title="Delete node">×</button>
+                    <button class="btn btn-execute" title="Execute this node">▶</button>
+                    <button class="btn btn-ghost btn-configure" title="Configure node">⚙</button>
+                    <button class="btn btn-ghost btn-delete" title="Delete node">×</button>
                 </div>
             `;
 
             // Set up drag handlers
             div.addEventListener('mousedown', (e) => this.onNodeMouseDown(e, node.id));
+
+            // Set up button handlers
+            const executeBtn = div.querySelector('.btn-execute');
+            if (executeBtn) {
+                executeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.executeNode(node.id);
+                });
+            }
+
+            const configureBtn = div.querySelector('.btn-configure');
+            if (configureBtn) {
+                configureBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.selectNode(node.id);
+                });
+            }
+
+            const deleteBtn = div.querySelector('.btn-delete');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.deleteNode(node.id);
+                });
+            }
 
             // Set up connection drag handlers
             const outputConnector = div.querySelector('.flow-node-connector.output');
@@ -4075,6 +4261,8 @@
         }
 
         addNode(method, path, x = 100, y = 100) {
+            console.log('[TestFlow] Adding node:', { method, path, x, y });
+
             const node = {
                 id: 'node-' + Date.now(),
                 method,
@@ -4093,6 +4281,12 @@
             };
 
             this.flowNodes.push(node);
+
+            console.log('[TestFlow] Node added:', {
+                id: node.id,
+                totalNodes: this.flowNodes.length
+            });
+
             this.renderNodes();
             this.saveFlow();
 
@@ -4100,6 +4294,8 @@
         }
 
         loadFlow() {
+            console.log('[TestFlow] Loading saved flow from localStorage...');
+
             try {
                 const saved = localStorage.getItem('test-flow');
                 if (saved) {
@@ -4107,9 +4303,17 @@
                     this.flowNodes = flow.nodes || [];
                     this.flowConnections = flow.connections || [];
                     this.flowVariables = flow.variables || {};
+
+                    console.log('[TestFlow] Flow loaded:', {
+                        nodes: this.flowNodes.length,
+                        connections: this.flowConnections.length,
+                        variables: Object.keys(this.flowVariables).length
+                    });
+                } else {
+                    console.log('[TestFlow] No saved flow found');
                 }
             } catch (error) {
-                console.error('Failed to load test flow:', error);
+                console.error('[TestFlow] Failed to load test flow:', error);
             }
         }
 
@@ -4121,9 +4325,9 @@
                     variables: this.flowVariables
                 };
                 localStorage.setItem('test-flow', JSON.stringify(flow));
-                console.log('Test flow saved');
+                console.log('[TestFlow] Flow saved to localStorage');
             } catch (error) {
-                console.error('Failed to save test flow:', error);
+                console.error('[TestFlow] Failed to save test flow:', error);
             }
         }
 
@@ -4282,14 +4486,30 @@
             // Merge flow variables with provided variables
             const allVars = { ...this.flowVariables, ...variables };
 
+            // Check if there are any variables to substitute
+            const hasVariables = value.match(/\{\{(\w+)\}\}/g);
+
+            if (hasVariables) {
+                console.log('[TestFlow] Substituting variables in:', value);
+                console.log('[TestFlow] Available variables:', Object.keys(allVars));
+            }
+
             // Replace {{variable_name}} patterns
-            return value.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
+            const result = value.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
                 if (varName in allVars) {
                     const val = allVars[varName].value;
+                    console.log(`[TestFlow] ✓ {{${varName}}} =`, val);
                     return val !== undefined ? val : match;
                 }
+                console.warn(`[TestFlow] ✗ Variable not found: {{${varName}}}`);
                 return match;
             });
+
+            if (hasVariables && result !== value) {
+                console.log('[TestFlow] Substitution result:', result);
+            }
+
+            return result;
         }
 
         substituteInObject(obj, variables = {}) {
@@ -4315,47 +4535,83 @@
         }
 
         extractValueFromResponse(response, jsonPath) {
+            console.log(`[TestFlow] Extracting value from response using path: ${jsonPath}`);
+
             try {
                 // Parse JSONPath like "response.token" or "response.data.user.id"
                 const parts = jsonPath.split('.');
                 let value = response;
 
+                console.log(`[TestFlow] Response structure:`, typeof response, Array.isArray(response) ? 'array' : 'object');
+
                 for (const part of parts) {
                     if (part === 'response') continue;
+
+                    console.log(`[TestFlow] Navigating to: ${part}, current value type:`, typeof value);
+
                     if (value && typeof value === 'object' && part in value) {
                         value = value[part];
+                        console.log(`[TestFlow] ✓ Found ${part}:`, value);
                     } else {
+                        console.warn(`[TestFlow] ✗ Path not found: ${part} in`, value);
                         return null;
                     }
                 }
 
+                console.log(`[TestFlow] ✓ Extracted value:`, value);
                 return value;
             } catch (error) {
-                console.error('Failed to extract value:', error);
+                console.error('[TestFlow] ✗ Failed to extract value:', error);
                 return null;
             }
         }
 
         extractVariables(node, response) {
+            console.log('[TestFlow] Extracting variables from node:', node.id);
+
             const extract = node.config.extract || [];
+            console.log('[TestFlow] Extraction rules:', extract);
+
+            let extractedCount = 0;
 
             extract.forEach(ext => {
-                if (!ext.path || !ext.as) return;
+                if (!ext.path || !ext.as) {
+                    console.warn('[TestFlow] Invalid extraction rule (missing path or as):', ext);
+                    return;
+                }
 
+                console.log(`[TestFlow] Extracting: ${ext.path} → ${ext.as}`);
                 const value = this.extractValueFromResponse(response, ext.path);
+
                 if (value !== null && value !== undefined) {
                     this.flowVariables[ext.as] = {
                         value: value,
                         source: `${node.method} ${node.path} → ${ext.path}`,
                         nodeId: node.id
                     };
+
+                    console.log(`[TestFlow] ✓ Extracted: ${ext.as} =`, value);
+                    extractedCount++;
+                } else {
+                    console.warn(`[TestFlow] ✗ Failed to extract: ${ext.path} (value not found)`);
                 }
             });
+
+            console.log(`[TestFlow] Total variables extracted: ${extractedCount}`);
+            console.log('[TestFlow] All flow variables:', this.flowVariables);
 
             this.renderVariables();
         }
 
         async executeFlow() {
+            console.log('[TestFlow] ========================================');
+            console.log('[TestFlow] Executing flow...');
+            console.log('[TestFlow] Flow state:', {
+                nodes: this.flowNodes.length,
+                connections: this.flowConnections.length,
+                existingVariables: Object.keys(this.flowVariables).length
+            });
+
             if (this.flowNodes.length === 0) {
                 this.showMessage('No nodes to execute', 'info');
                 return;
@@ -4372,9 +4628,12 @@
                 // Build execution order from connections
                 const executionOrder = this.buildExecutionOrder();
 
+                console.log('[TestFlow] Execution order:', executionOrder);
+
                 if (executionOrder.length === 0) {
                     // Execute all nodes if no connections
                     executionOrder.push(...this.flowNodes.map(n => n.id));
+                    console.log('[TestFlow] No connections, executing all nodes independently');
                 }
 
                 // Reset all node statuses
@@ -4385,6 +4644,7 @@
                 this.renderNodes();
 
                 // Clear variables before execution
+                console.log('[TestFlow] Clearing previous variables');
                 this.flowVariables = {};
                 this.renderVariables();
 
@@ -4467,10 +4727,17 @@
         }
 
         deleteNode(nodeId) {
+            console.log('[TestFlow] Deleting node:', nodeId);
+
             this.flowNodes = this.flowNodes.filter(n => n.id !== nodeId);
             this.flowConnections = this.flowConnections.filter(c =>
                 c.from !== nodeId && c.to !== nodeId
             );
+
+            console.log('[TestFlow] Node deleted, remaining:', {
+                nodes: this.flowNodes.length,
+                connections: this.flowConnections.length
+            });
 
             this.renderNodes();
             this.renderConnections();
@@ -4483,7 +4750,18 @@
 
         async executeNode(nodeId, variables = {}) {
             const node = this.flowNodes.find(n => n.id === nodeId);
-            if (!node) return;
+            if (!node) {
+                console.error('[TestFlow] Node not found:', nodeId);
+                return;
+            }
+
+            console.log('[TestFlow] ========================================');
+            console.log('[TestFlow] Executing node:', {
+                id: node.id,
+                method: node.method,
+                path: node.path,
+                availableVariables: Object.keys(variables)
+            });
 
             // Update node status
             node.status = 'running';
@@ -4491,19 +4769,41 @@
 
             try {
                 // Build request with substituted variables
+                console.log('[TestFlow] Building request with variables:', variables);
                 const request = this.buildNodeRequest(node, variables);
 
+                console.log('[TestFlow] Request built:', {
+                    method: request.method,
+                    url: request.url,
+                    headers: Object.keys(request.headers),
+                    hasBody: !!request.body
+                });
+
+                if (request.body) {
+                    console.log('[TestFlow] Request body:', request.body);
+                }
+
                 // Execute request
+                console.log('[TestFlow] Sending HTTP request...');
                 const startTime = Date.now();
                 const response = await this.executeRequest(request);
                 const duration = Date.now() - startTime;
+
+                console.log('[TestFlow] Response received:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    duration: `${duration}ms`
+                });
 
                 // Parse response
                 let responseData;
                 try {
                     responseData = await response.json();
+                    console.log('[TestFlow] Response data (JSON):', responseData);
                 } catch {
                     responseData = await response.text();
+                    console.log('[TestFlow] Response data (text):', responseData);
                 }
 
                 // Update node with result
@@ -4514,7 +4814,18 @@
                     data: responseData
                 };
 
+                console.log('[TestFlow] Node result updated:', {
+                    id: node.id,
+                    status: node.status,
+                    resultStatus: node.result.status,
+                    resultTime: node.result.time
+                });
+
                 // Extract variables from response
+                if (response.ok) {
+                    console.log('[TestFlow] Extracting variables from response...');
+                    this.extractVariables(node, responseData);
+                }
                 if (response.ok) {
                     this.extractVariables(node, responseData);
                 }
@@ -4766,7 +5077,42 @@
 
             const config = node.config;
 
+            // Build response section HTML if node has been executed
+            let responseSectionHTML = '';
+            if (node.result) {
+                const responseData = node.result.data || {};
+                const responseText = typeof responseData === 'object'
+                    ? JSON.stringify(responseData, null, 2)
+                    : responseData;
+
+                responseSectionHTML = `
+                    <div class="config-section" style="border-left: 3px solid ${node.status === 'success' ? '#28a745' : '#dc3545'}">
+                        <div class="config-section-title">Latest Response</div>
+                        <div class="config-field">
+                            <label>Status</label>
+                            <input type="text" value="${node.result.status || node.result.error || 'N/A'}" readonly
+                                   style="color: ${node.status === 'success' ? '#28a745' : '#dc3545'}; font-weight: bold;">
+                        </div>
+                        ${node.result.time ? `
+                        <div class="config-field">
+                            <label>Time</label>
+                            <input type="text" value="${node.result.time}ms" readonly>
+                        </div>
+                        ` : ''}
+                        <div class="config-field">
+                            <label>Response Body</label>
+                            <textarea readonly style="font-family: monospace; font-size: 12px; min-height: 150px; background: var(--bg-tertiary);">${this.escapeHtml(responseText)}</textarea>
+                            <p class="text-muted" style="font-size: 11px; margin-top: 4px;">
+                                Use this response to define variable extractions below
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }
+
             this.configContent.innerHTML = `
+                ${responseSectionHTML}
+
                 <div class="config-section">
                     <div class="config-section-title">Endpoint</div>
                     <div class="config-field">
@@ -4787,13 +5133,13 @@
                 <div class="config-section">
                     <div class="config-section-title">Query Parameters</div>
                     <div id="config-query-params"></div>
-                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.addConfigQueryParam('${nodeId}')">+ Add Parameter</button>
+                    <button class="btn btn-ghost btn-sm btn-add-query-param">+ Add Parameter</button>
                 </div>
 
                 <div class="config-section">
                     <div class="config-section-title">Headers</div>
                     <div id="config-headers"></div>
-                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.addConfigHeader('${nodeId}')">+ Add Header</button>
+                    <button class="btn btn-ghost btn-sm btn-add-header">+ Add Header</button>
                 </div>
 
                 ${['POST', 'PUT', 'PATCH'].includes(node.method) ? `
@@ -4808,14 +5154,14 @@
                 <div class="config-section">
                     <div class="config-section-title">Variable Extraction</div>
                     <div id="config-extract"></div>
-                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.addConfigExtract('${nodeId}')">+ Add Extraction</button>
+                    <button class="btn btn-ghost btn-sm btn-add-extract">+ Add Extraction</button>
                     <p class="text-muted" style="font-size: 12px; margin-top: 8px;">
                         Use JSONPath: response.token, response.data.id
                     </p>
                 </div>
 
                 <div class="config-section">
-                    <button class="btn" onclick="app.apiConsole.testFlowManager.saveNodeConfig('${nodeId}')">Save Configuration</button>
+                    <button class="btn btn-save-config">Save Configuration</button>
                 </div>
             `;
 
@@ -4838,6 +5184,27 @@
                     const node = this.flowNodes.find(n => n.id === nodeId);
                     if (node) node.config.body = e.target.value;
                 });
+            }
+
+            // Set up button event listeners
+            const addQueryParamBtn = this.configContent.querySelector('.btn-add-query-param');
+            if (addQueryParamBtn) {
+                addQueryParamBtn.addEventListener('click', () => this.addConfigQueryParam(nodeId));
+            }
+
+            const addHeaderBtn = this.configContent.querySelector('.btn-add-header');
+            if (addHeaderBtn) {
+                addHeaderBtn.addEventListener('click', () => this.addConfigHeader(nodeId));
+            }
+
+            const addExtractBtn = this.configContent.querySelector('.btn-add-extract');
+            if (addExtractBtn) {
+                addExtractBtn.addEventListener('click', () => this.addConfigExtract(nodeId));
+            }
+
+            const saveConfigBtn = this.configContent.querySelector('.btn-save-config');
+            if (saveConfigBtn) {
+                saveConfigBtn.addEventListener('click', () => this.saveNodeConfig(nodeId));
             }
         }
 
@@ -4863,12 +5230,21 @@
                     <div class="kv-row">
                         <input type="text" value="${this.escapeHtml(param.name)}" readonly style="background: var(--bg-tertiary);">
                         <input type="text"
+                               class="path-param-input"
+                               data-param-name="${this.escapeHtml(param.name)}"
                                placeholder="Value or {{variable}}"
-                               value="${saved ? saved.value : ''}"
-                               onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'pathParams', '${param.name}', 'value', this.value)">
+                               value="${saved ? saved.value : ''}">
                     </div>
                 `;
             }).join('');
+
+            // Add event listeners
+            container.querySelectorAll('.path-param-input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const paramName = e.target.getAttribute('data-param-name');
+                    this.updateConfigParam(nodeId, 'pathParams', paramName, 'value', e.target.value);
+                });
+            });
         }
 
         renderConfigQueryParams(nodeId) {
@@ -4887,13 +5263,33 @@
 
             container.innerHTML = params.map((param, index) => `
                 <div class="kv-row">
-                    <input type="text" placeholder="Key" value="${param.key || ''}"
-                           onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'queryParams', ${index}, 'key', this.value)">
-                    <input type="text" placeholder="Value or {{variable}}" value="${param.value || ''}"
-                           onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'queryParams', ${index}, 'value', this.value)">
-                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.removeConfigParam('${nodeId}', 'queryParams', ${index})">×</button>
+                    <input type="text" class="query-param-key" data-index="${index}" placeholder="Key" value="${param.key || ''}">
+                    <input type="text" class="query-param-value" data-index="${index}" placeholder="Value or {{variable}}" value="${param.value || ''}">
+                    <button class="btn btn-ghost btn-sm btn-remove-query-param" data-index="${index}">×</button>
                 </div>
             `).join('');
+
+            // Add event listeners
+            container.querySelectorAll('.query-param-key').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.updateConfigParam(nodeId, 'queryParams', index, 'key', e.target.value);
+                });
+            });
+
+            container.querySelectorAll('.query-param-value').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.updateConfigParam(nodeId, 'queryParams', index, 'value', e.target.value);
+                });
+            });
+
+            container.querySelectorAll('.btn-remove-query-param').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.removeConfigParam(nodeId, 'queryParams', index);
+                });
+            });
         }
 
         renderConfigHeaders(nodeId) {
@@ -4912,13 +5308,33 @@
 
             container.innerHTML = headers.map((header, index) => `
                 <div class="kv-row">
-                    <input type="text" placeholder="Header name" value="${header.key || ''}"
-                           onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'headers', ${index}, 'key', this.value)">
-                    <input type="text" placeholder="Value or {{variable}}" value="${header.value || ''}"
-                           onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'headers', ${index}, 'value', this.value)">
-                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.removeConfigParam('${nodeId}', 'headers', ${index})">×</button>
+                    <input type="text" class="header-key" data-index="${index}" placeholder="Header name" value="${header.key || ''}">
+                    <input type="text" class="header-value" data-index="${index}" placeholder="Value or {{variable}}" value="${header.value || ''}">
+                    <button class="btn btn-ghost btn-sm btn-remove-header" data-index="${index}">×</button>
                 </div>
             `).join('');
+
+            // Add event listeners
+            container.querySelectorAll('.header-key').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.updateConfigParam(nodeId, 'headers', index, 'key', e.target.value);
+                });
+            });
+
+            container.querySelectorAll('.header-value').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.updateConfigParam(nodeId, 'headers', index, 'value', e.target.value);
+                });
+            });
+
+            container.querySelectorAll('.btn-remove-header').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.removeConfigParam(nodeId, 'headers', index);
+                });
+            });
         }
 
         renderConfigExtract(nodeId) {
@@ -4937,14 +5353,34 @@
 
             container.innerHTML = extract.map((ext, index) => `
                 <div class="kv-row">
-                    <input type="text" placeholder="response.path" value="${ext.path || ''}"
-                           onchange="app.apiConsole.testFlowManager.updateConfigExtract('${nodeId}', ${index}, 'path', this.value)">
+                    <input type="text" class="extract-path" data-index="${index}" placeholder="response.path" value="${ext.path || ''}">
                     <span style="padding: 6px;">→</span>
-                    <input type="text" placeholder="variable_name" value="${ext.as || ''}"
-                           onchange="app.apiConsole.testFlowManager.updateConfigExtract('${nodeId}', ${index}, 'as', this.value)">
-                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.removeConfigExtract('${nodeId}', ${index})">×</button>
+                    <input type="text" class="extract-as" data-index="${index}" placeholder="variable_name" value="${ext.as || ''}">
+                    <button class="btn btn-ghost btn-sm btn-remove-extract" data-index="${index}">×</button>
                 </div>
             `).join('');
+
+            // Add event listeners
+            container.querySelectorAll('.extract-path').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.updateConfigExtract(nodeId, index, 'path', e.target.value);
+                });
+            });
+
+            container.querySelectorAll('.extract-as').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.updateConfigExtract(nodeId, index, 'as', e.target.value);
+                });
+            });
+
+            container.querySelectorAll('.btn-remove-extract').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    this.removeConfigExtract(nodeId, index);
+                });
+            });
         }
 
         extractPathParams(path) {
@@ -5057,18 +5493,6 @@
             }
 
             return null;
-        }
-
-        filterEndpoints(query) {
-            const items = this.endpointLibrary.querySelectorAll('.endpoint-item');
-            const q = query.toLowerCase();
-
-            items.forEach(item => {
-                const path = item.dataset.path.toLowerCase();
-                const method = item.dataset.method.toLowerCase();
-                const match = path.includes(q) || method.includes(q);
-                item.style.display = match ? 'flex' : 'none';
-            });
         }
 
         addConfigQueryParam(nodeId) {

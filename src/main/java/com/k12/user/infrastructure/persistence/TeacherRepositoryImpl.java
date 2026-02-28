@@ -8,6 +8,7 @@ import com.k12.user.domain.models.specialization.teacher.TeacherId;
 import com.k12.user.domain.ports.out.TeacherRepository;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -24,6 +25,7 @@ public class TeacherRepositoryImpl implements TeacherRepository {
     private final AgroalDataSource dataSource;
 
     @Override
+    @Transactional
     public Teacher save(Teacher teacher) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 

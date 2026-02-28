@@ -17,6 +17,7 @@ import com.k12.user.infrastructure.rest.dto.CreateUserRequest;
 import com.k12.user.infrastructure.rest.dto.UpdateUserRequest;
 import com.k12.user.infrastructure.rest.dto.UserResponse;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 
@@ -36,6 +37,7 @@ public class UserService {
     private final StudentRepository studentRepository;
     private final AdminRepository adminRepository;
 
+    @Transactional
     public Result<UserResponse, UserError> createUser(CreateUserRequest request) {
         // Check email uniqueness
         var existingUser = userRepository.findByEmailAddress(request.email());
@@ -66,16 +68,16 @@ public class UserService {
         var userCreatedEvent = userResult.get();
         var user = com.k12.user.domain.models.UserReconstructor.applyEvent(null, userCreatedEvent);
 
-        // Create specialization based on role
+        // Save user FIRST (required for foreign key constraints)
+        userRepository.save(user);
+
+        // Create specialization based on role (user must exist first)
         switch (request.role().value()) {
             case "TEACHER" -> createTeacher(userId, request.teacherData());
             case "PARENT" -> createParent(userId, request.parentData());
             case "STUDENT" -> createStudent(userId, request.studentData());
             case "ADMIN" -> createAdmin(userId);
         }
-
-        // Save user
-        userRepository.save(user);
 
         // Build response
         return Result.success(buildUserResponse(user, request));

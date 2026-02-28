@@ -9,9 +9,19 @@ import com.k12.user.infrastructure.rest.mapper.UserErrorResponseMapper;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import jakarta.ws.rs.*;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PATCH;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.SecurityContext;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 
@@ -25,8 +35,11 @@ public class UserResource {
 
     @POST
     @Operation(summary = "Create a new user", description = "Creates a new user with role-based specialization data")
-    public Response createUser(@Valid CreateUserRequest request) {
-        // TODO: Extract tenantId from JWT
+    public Response createUser(@Valid CreateUserRequest request, @Context SecurityContext securityContext) {
+
+        // TODO: Extract tenant from JWT (in real implementation)
+        // For now, UserService uses DEFAULT_TENANT_ID internally
+
         var result = userService.createUser(request);
         return result.fold(
                 response -> Response.status(Response.Status.CREATED)

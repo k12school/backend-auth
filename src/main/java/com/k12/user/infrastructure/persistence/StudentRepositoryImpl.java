@@ -12,6 +12,7 @@ import com.k12.user.domain.models.specialization.student.StudentStatus;
 import com.k12.user.domain.ports.out.StudentRepository;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ public class StudentRepositoryImpl implements StudentRepository {
     private final AgroalDataSource dataSource;
 
     @Override
+    @Transactional
     public Student save(Student student) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 

@@ -10,6 +10,7 @@ import com.k12.user.domain.models.specialization.parent.ParentStatus;
 import com.k12.user.domain.ports.out.ParentRepository;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashSet;
@@ -27,6 +28,7 @@ public class ParentRepositoryImpl implements ParentRepository {
     private final AgroalDataSource dataSource;
 
     @Override
+    @Transactional
     public Parent save(Parent parent) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
 
