@@ -14,6 +14,8 @@ import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
@@ -25,8 +27,57 @@ class TeacherRepositoryImplTest {
     @Inject
     io.agroal.api.AgroalDataSource dataSource;
 
+    private DSLContext ctx;
+
+    @BeforeEach
+    void setUp() {
+        ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        // Delete in correct order due to foreign key constraints
+        ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.Teachers.TEACHERS)
+                .execute();
+        ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS)
+                .execute();
+
+        // Ensure the default tenant exists
+        long tenantCount =
+                ctx.fetchCount(ctx.selectFrom(com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS)
+                        .where(com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.ID.eq(
+                                java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"))));
+        if (tenantCount == 0) {
+            ctx.insertInto(
+                            com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS,
+                            com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.ID,
+                            com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.NAME,
+                            com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.SUBDOMAIN,
+                            com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.STATUS,
+                            com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.VERSION,
+                            com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.CREATED_AT,
+                            com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.UPDATED_AT)
+                    .values(
+                            java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                            "Default Tenant",
+                            "default",
+                            "ACTIVE",
+                            0L,
+                            java.time.OffsetDateTime.now(),
+                            java.time.OffsetDateTime.now())
+                    .execute();
+        }
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (ctx != null) {
+            // Delete in correct order due to foreign key constraints
+            ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.Teachers.TEACHERS)
+                    .execute();
+            ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS)
+                    .execute();
+        }
+    }
+
     private DSLContext getDSLContext() {
-        return DSL.using(dataSource, SQLDialect.POSTGRES);
+        return ctx != null ? ctx : DSL.using(dataSource, SQLDialect.POSTGRES);
     }
 
     private void createTestUser(UUID userId) {
@@ -52,7 +103,7 @@ class TeacherRepositoryImplTest {
                         "Test Teacher",
                         java.time.OffsetDateTime.now(),
                         java.time.OffsetDateTime.now(),
-                        UUID.fromString("660e8400-e29b-41d4-a716-446655440001"))
+                        UUID.fromString("00000000-0000-0000-0000-000000000001"))
                 .execute();
     }
 
@@ -83,7 +134,7 @@ class TeacherRepositoryImplTest {
                         "Test Teacher",
                         java.time.OffsetDateTime.now(),
                         java.time.OffsetDateTime.now(),
-                        UUID.fromString("660e8400-e29b-41d4-a716-446655440001"))
+                        UUID.fromString("00000000-0000-0000-0000-000000000001"))
                 .execute();
 
         UserId userIdObj = UserId.of(userId.toString());
@@ -100,7 +151,7 @@ class TeacherRepositoryImplTest {
     void testFindById() {
         UUID userId = UUID.randomUUID();
         createTestUser(userId);
-        UserId userIdObj = UserId.of("550e8400-e29b-41d4-a716-446655440001");
+        UserId userIdObj = UserId.of(userId.toString());
         Teacher teacher = TeacherFactory.create(userIdObj, "EMP456", "Mathematics", LocalDate.of(2024, 2, 1));
 
         teacherRepository.save(teacher);
@@ -115,14 +166,14 @@ class TeacherRepositoryImplTest {
     void testFindByEmployeeId() {
         UUID userId = UUID.randomUUID();
         createTestUser(userId);
-        UserId userIdObj = UserId.of("550e8400-e29b-41d4-a716-446655440002");
+        UserId userIdObj = UserId.of(userId.toString());
         Teacher teacher = TeacherFactory.create(userIdObj, "EMP789", "English", LocalDate.of(2024, 3, 1));
 
         teacherRepository.save(teacher);
 
         var found = teacherRepository.findByEmployeeId("EMP789");
         assertTrue(found.isPresent());
-        assertEquals(userId, found.get().teacherId().value());
+        assertEquals(userId, found.get().teacherId().id());
         assertEquals("English", found.get().department());
     }
 
@@ -130,7 +181,7 @@ class TeacherRepositoryImplTest {
     void testExistsByUserId() {
         UUID userId = UUID.randomUUID();
         createTestUser(userId);
-        UserId userIdObj = UserId.of("550e8400-e29b-41d4-a716-446655440003");
+        UserId userIdObj = UserId.of(userId.toString());
         Teacher teacher = TeacherFactory.create(userIdObj, "EMP321", "History", LocalDate.of(2024, 4, 1));
 
         assertFalse(teacherRepository.existsByUserId(userIdObj));
@@ -144,7 +195,7 @@ class TeacherRepositoryImplTest {
     void testEmployeeUniqueness() {
         UUID userId = UUID.randomUUID();
         createTestUser(userId);
-        UserId userIdObj = UserId.of("550e8400-e29b-41d4-a716-446655440010");
+        UserId userIdObj = UserId.of(userId.toString());
         Teacher teacher = TeacherFactory.create(userIdObj, "EMP654", "Geography", LocalDate.of(2024, 5, 1));
 
         assertFalse(teacherRepository.findByEmployeeId("EMP654").isPresent());
@@ -161,8 +212,8 @@ class TeacherRepositoryImplTest {
         createTestUser(userId1);
         createTestUser(userId2);
 
-        UserId userId1Obj = UserId.of("550e8400-e29b-41d4-a716-446655440004");
-        UserId userId2Obj = UserId.of("550e8400-e29b-41d4-a716-446655440005");
+        UserId userId1Obj = UserId.of(userId1.toString());
+        UserId userId2Obj = UserId.of(userId2.toString());
 
         int initialCount = teacherRepository.findAll().size();
 
@@ -183,7 +234,7 @@ class TeacherRepositoryImplTest {
     void testFindByDepartment() {
         UUID userId = UUID.randomUUID();
         createTestUser(userId);
-        UserId userIdObj = UserId.of("550e8400-e29b-41d4-a716-446655440006");
+        UserId userIdObj = UserId.of(userId.toString());
         Teacher teacher = TeacherFactory.create(userIdObj, "EMP300", "Computer Science", LocalDate.of(2024, 6, 1));
 
         teacherRepository.save(teacher);
@@ -200,7 +251,7 @@ class TeacherRepositoryImplTest {
     void testDeleteById() {
         UUID userId = UUID.randomUUID();
         createTestUser(userId);
-        UserId userIdObj = UserId.of("550e8400-e29b-41d4-a716-446655440007");
+        UserId userIdObj = UserId.of(userId.toString());
         Teacher teacher = TeacherFactory.create(userIdObj, "EMP400", "Biology", LocalDate.of(2024, 7, 1));
 
         teacherRepository.save(teacher);
@@ -220,7 +271,7 @@ class TeacherRepositoryImplTest {
 
         UUID userId = UUID.randomUUID();
         createTestUser(userId);
-        UserId userIdObj = UserId.of("550e8400-e29b-41d4-a716-446655440008");
+        UserId userIdObj = UserId.of(userId.toString());
         Teacher teacher = TeacherFactory.create(userIdObj, "EMP500", "Art", LocalDate.of(2024, 8, 1));
 
         teacherRepository.save(teacher);
@@ -232,7 +283,7 @@ class TeacherRepositoryImplTest {
     void testUpdateTeacher() {
         UUID userId = UUID.randomUUID();
         createTestUser(userId);
-        UserId userIdObj = UserId.of("550e8400-e29b-41d4-a716-446655440009");
+        UserId userIdObj = UserId.of(userId.toString());
         Teacher teacher = TeacherFactory.create(userIdObj, "EMP600", "Music", LocalDate.of(2024, 9, 1));
 
         teacherRepository.save(teacher);

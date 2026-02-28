@@ -41,6 +41,7 @@ class UserRepositoryImplIntegrationTest {
         // Ensure test data exists
         setupTestData.setupTestUser();
 
+        // Use the user ID created by SetupTestData
         UserId userId = UserId.of("550e8400-e29b-41d4-a716-446655440000");
         Optional<User> user = userRepository.findById(userId);
         assertTrue(user.isPresent());

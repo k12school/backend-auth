@@ -43,16 +43,42 @@ class TenantRepositoryIntegrationTest {
     @BeforeEach
     void setUp() {
         ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        // Delete in correct order due to foreign key constraints
         ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS)
                 .execute();
+        ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS)
+                .execute();
         ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS)
+                .execute();
+
+        // Recreate the default tenant that other tests depend on
+        ctx.insertInto(
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.ID,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.NAME,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.SUBDOMAIN,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.STATUS,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.VERSION,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.CREATED_AT,
+                        com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS.UPDATED_AT)
+                .values(
+                        java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                        "Default Tenant",
+                        "default",
+                        "ACTIVE",
+                        0L,
+                        java.time.OffsetDateTime.now(),
+                        java.time.OffsetDateTime.now())
                 .execute();
     }
 
     @AfterEach
     void tearDown() {
         if (ctx != null) {
+            // Delete in correct order due to foreign key constraints
             ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.TenantEvents.TENANT_EVENTS)
+                    .execute();
+            ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS)
                     .execute();
             ctx.deleteFrom(com.k12.backend.infrastructure.jooq.public_.tables.Tenants.TENANTS)
                     .execute();

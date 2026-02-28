@@ -99,10 +99,10 @@ public class SetupTestData {
         // Setup tenant first
         setupTestTenant(ctx, tenantId);
 
-        // Check if user already exists in users table
+        // Check if user already exists in users table (by email, since migration creates super admin)
         Long existingUserCount = ctx.selectCount()
                 .from(com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS)
-                .where(com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS.ID.eq(userId))
+                .where(com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS.EMAIL.eq("admin@k12.com"))
                 .fetchOne(0, Long.class);
 
         if (existingUserCount != null && existingUserCount > 0) {
@@ -118,7 +118,7 @@ public class SetupTestData {
                 new HashSet<>(java.util.Set.of(UserRole.SUPER_ADMIN)),
                 UserStatus.ACTIVE,
                 new UserName("Super Administrator"),
-                new com.k12.common.domain.model.TenantId("default-tenant"),
+                new com.k12.common.domain.model.TenantId(tenantId.toString()),
                 Instant.now(),
                 1L);
 
@@ -190,6 +190,7 @@ public class SetupTestData {
 
             // Register User value objects
             kryo.register(com.k12.common.domain.model.UserId.class);
+            kryo.register(com.k12.common.domain.model.TenantId.class);
             kryo.register(EmailAddress.class);
             kryo.register(PasswordHash.class);
             kryo.register(UserName.class);

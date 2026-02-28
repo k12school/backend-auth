@@ -608,6 +608,203 @@
             background: var(--bg-tertiary);
         }
 
+        /* Message Toast */
+        .flow-message-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .flow-message-toast.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border-left: 4px solid #4caf50;
+        }
+
+        .flow-message-toast.error {
+            background: #ffebee;
+            color: #d32f2f;
+            border-left: 4px solid #f44336;
+        }
+
+        .flow-message-toast.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 4px solid #2196f3;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Loading States */
+        .flow-node.loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .flow-node.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 24px;
+            height: 24px;
+            margin: -12px 0 0 -12px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn.loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            top: 50%;
+            left: 50%;
+            margin: -7px 0 0 -7px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Error Display in Nodes */
+        .flow-node-error {
+            background: #ffebee;
+            color: #d32f2f;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 8px;
+            border-left: 3px solid #f44336;
+        }
+
+        /* Button Tooltips */
+        .flow-actions .btn {
+            position: relative;
+        }
+
+        .flow-actions .btn[title]:hover::before {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            background: #333;
+            color: #fff;
+            font-size: 12px;
+            white-space: nowrap;
+            border-radius: 4px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .flow-actions .btn[title]:hover::after {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 2px;
+            border: 5px solid transparent;
+            border-top-color: #333;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1366px) {
+            .flow-config-panel {
+                width: 300px;
+                min-width: 300px;
+            }
+
+            .variables-panel {
+                right: 316px;
+            }
+
+            .flow-node {
+                width: 240px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .test-flow-panel {
+                flex-direction: column;
+            }
+
+            .flow-canvas-wrapper {
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .flow-config-panel {
+                width: 100%;
+                min-width: 100%;
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+                max-height: 400px;
+            }
+
+            .variables-panel {
+                right: 16px;
+                bottom: 416px;
+            }
+
+            .flow-actions {
+                flex-wrap: wrap;
+            }
+
+            .flow-actions .btn {
+                flex: 1 1 auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .flow-node {
+                width: 200px;
+            }
+
+            .flow-node-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .flow-actions .btn {
+                font-size: 13px;
+                padding: 6px 10px;
+            }
+        }
+
         /* Try It Panel */
         .try-panel {
             width: 500px;
@@ -1458,11 +1655,14 @@
                 <div class="panel-header">
                     <div class="panel-title">Test Flow</div>
                     <div class="flow-actions">
-                        <button id="flow-execute-btn" class="btn">▶ Execute Flow</button>
-                        <button id="flow-save-btn" class="btn">Save</button>
-                        <button id="flow-export-btn" class="btn btn-ghost">Export</button>
-                        <button id="flow-clear-btn" class="btn btn-ghost">Clear</button>
+                        <button id="flow-execute-btn" class="btn" title="Execute entire flow (Ctrl+Enter)">▶ Execute Flow</button>
+                        <button id="flow-save-btn" class="btn" title="Save flow to browser storage (Ctrl+S)">Save</button>
+                        <button id="flow-import-btn" class="btn btn-ghost" title="Import flow from JSON file">Import</button>
+                        <button id="flow-export-btn" class="btn btn-ghost" title="Export flow to JSON file">Export</button>
+                        <button id="flow-clear-btn" class="btn btn-ghost" title="Clear all nodes (Delete)">Clear</button>
+                        <button id="flow-help-btn" class="btn btn-ghost" title="Show help (F1)">?</button>
                     </div>
+                    <input type="file" id="flow-import-input" accept=".json" style="display: none;">
                 </div>
 
                 <!-- Panel Content -->
@@ -1523,13 +1723,16 @@
             <div class="help-section">
                 <h3>Keyboard Shortcuts</h3>
                 <ul>
-                    <li><kbd>Ctrl</kbd> + <kbd>Enter</kbd> - Send request</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>Enter</kbd> - Send request / Execute flow</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>S</kbd> - Save flow</li>
                     <li><kbd>Ctrl</kbd> + <kbd>K</kbd> - Focus URL input</li>
                     <li><kbd>Ctrl</kbd> + <kbd>H</kbd> - Toggle history panel</li>
                     <li><kbd>Ctrl</kbd> + <kbd>F</kbd> - Toggle favorites panel</li>
                     <li><kbd>Ctrl</kbd> + <kbd>D</kbd> - Toggle dark mode</li>
                     <li><kbd>Ctrl</kbd> + <kbd>N</kbd> - New request</li>
-                    <li><kbd>Esc</kbd> - Close modal</li>
+                    <li><kbd>Delete</kbd> - Clear flow (when no node selected)</li>
+                    <li><kbd>Esc</kbd> - Close modal / Deselect node</li>
+                    <li><kbd>F1</kbd> - Show this help</li>
                 </ul>
             </div>
             <div class="help-section">
@@ -1556,6 +1759,20 @@
                     <li><strong>Example bodies:</strong> Request body examples are auto-generated from OpenAPI schemas</li>
                     <li><strong>Query parameters:</strong> Parameters from the OpenAPI spec are automatically filled in</li>
                 </ul>
+            </div>
+            <div class="help-section">
+                <h3>🧪 Test Flow Panel</h3>
+                <p>Create automated test sequences by connecting API endpoints.</p>
+                <ul>
+                    <li><strong>Add nodes:</strong> Drag endpoints from the library onto the canvas</li>
+                    <li><strong>Connect nodes:</strong> Drag from output connector (right) to input connector (left)</li>
+                    <li><strong>Configure nodes:</strong> Click a node to edit its request, headers, body, and variable extraction</li>
+                    <li><strong>Variable extraction:</strong> Extract values from responses using JSONPath (e.g., <code>$.token</code>)</li>
+                    <li><strong>Use variables:</strong> Reference extracted values as <code>{{variable_name}}</code> in subsequent requests</li>
+                    <li><strong>Execute flow:</strong> Run the entire sequence or individual nodes</li>
+                    <li><strong>Save/Load:</strong> Flows are auto-saved to browser storage. Export/import JSON for backup/sharing</li>
+                </ul>
+                <p><strong>Example Flow:</strong> Login → Extract Token → Get Tenant (using token) → Create Admin</p>
             </div>
         </div>
     </div>
@@ -3555,6 +3772,23 @@
                 exportBtn.addEventListener('click', () => this.exportFlow());
             }
 
+            // Import button
+            const importBtn = document.getElementById('flow-import-btn');
+            const importInput = document.getElementById('flow-import-input');
+            if (importBtn && importInput) {
+                importBtn.addEventListener('click', () => importInput.click());
+                importInput.addEventListener('change', (e) => this.importFlow(e));
+            }
+
+            // Help button
+            const helpBtn = document.getElementById('flow-help-btn');
+            if (helpBtn) {
+                helpBtn.addEventListener('click', () => this.showHelp());
+            }
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+
             // Close config button
             const closeConfigBtn = document.getElementById('close-config-btn');
             if (closeConfigBtn) {
@@ -3684,6 +3918,11 @@
                 div.classList.add('selected');
             }
 
+            // Add loading class if running
+            if (node.status === 'running') {
+                div.classList.add('loading');
+            }
+
             // Status indicator
             const statusClass = node.status || 'pending';
             const statusText = this.getStatusText(node);
@@ -3703,11 +3942,13 @@
                         `<div class="flow-node-extract">
                             Extracts: ${node.config.extract.map(e => e.as).join(', ')}
                         </div>` : ''}
+                    ${node.status === 'error' && node.result?.error ?
+                        `<div class="flow-node-error">${node.result.error}</div>` : ''}
                 </div>
                 <div class="flow-node-actions">
-                    <button class="btn" onclick="app.apiConsole.testFlowManager.executeNode('${node.id}')">▶</button>
-                    <button class="btn btn-ghost" onclick="app.apiConsole.testFlowManager.selectNode('${node.id}')">⚙</button>
-                    <button class="btn btn-ghost" onclick="app.apiConsole.testFlowManager.deleteNode('${node.id}')">×</button>
+                    <button class="btn" onclick="app.apiConsole.testFlowManager.executeNode('${node.id}')" title="Execute this node">▶</button>
+                    <button class="btn btn-ghost" onclick="app.apiConsole.testFlowManager.selectNode('${node.id}')" title="Configure node">⚙</button>
+                    <button class="btn btn-ghost" onclick="app.apiConsole.testFlowManager.deleteNode('${node.id}')" title="Delete node">×</button>
                 </div>
             `;
 
@@ -3912,6 +4153,129 @@
             URL.revokeObjectURL(url);
         }
 
+        importFlow(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const flow = JSON.parse(e.target.result);
+
+                    // Validate flow structure
+                    if (!flow.nodes || !Array.isArray(flow.nodes)) {
+                        throw new Error('Invalid flow: missing or invalid nodes array');
+                    }
+
+                    if (!flow.connections || !Array.isArray(flow.connections)) {
+                        throw new Error('Invalid flow: missing or invalid connections array');
+                    }
+
+                    if (!flow.variables || typeof flow.variables !== 'object') {
+                        throw new Error('Invalid flow: missing or invalid variables object');
+                    }
+
+                    // Validate each node has required fields
+                    for (const node of flow.nodes) {
+                        if (!node.id || !node.method || !node.path || typeof node.x !== 'number' || typeof node.y !== 'number') {
+                            throw new Error(`Invalid node: ${JSON.stringify(node)}`);
+                        }
+                    }
+
+                    // Load the flow
+                    this.flowNodes = flow.nodes;
+                    this.flowConnections = flow.connections;
+                    this.flowVariables = flow.variables;
+
+                    // Re-render
+                    this.renderNodes();
+                    this.renderConnections();
+                    this.renderVariables();
+                    this.saveFlow();
+
+                    // Show success message
+                    this.showMessage('Flow imported successfully!', 'success');
+                } catch (error) {
+                    console.error('Failed to import flow:', error);
+                    this.showMessage(`Failed to import flow: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsText(file);
+
+            // Reset input
+            event.target.value = '';
+        }
+
+        showMessage(message, type = 'info') {
+            // Create or update message toast
+            let toast = document.getElementById('flow-message-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'flow-message-toast';
+                toast.className = 'flow-message-toast';
+                document.body.appendChild(toast);
+            }
+
+            toast.textContent = message;
+            toast.className = `flow-message-toast ${type}`;
+            toast.style.display = 'block';
+
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        showHelp() {
+            const helpModal = document.getElementById('help-modal');
+            if (helpModal) {
+                helpModal.classList.remove('hidden');
+            }
+        }
+
+        handleKeyboard(event) {
+            // Only handle shortcuts when Test Flow panel is visible
+            const testFlowPanel = document.getElementById('test-flow-panel');
+            if (!testFlowPanel || testFlowPanel.style.display === 'none') return;
+
+            // Ctrl+Enter: Execute flow
+            if (event.ctrlKey && event.key === 'Enter') {
+                event.preventDefault();
+                this.executeFlow();
+                return;
+            }
+
+            // Ctrl+S: Save flow
+            if (event.ctrlKey && event.key === 's') {
+                event.preventDefault();
+                this.saveFlow();
+                this.showMessage('Flow saved!', 'success');
+                return;
+            }
+
+            // Delete: Clear flow (only if no node is selected)
+            if (event.key === 'Delete' && !this.selectedNodeId) {
+                event.preventDefault();
+                if (confirm('Are you sure you want to clear the entire flow?')) {
+                    this.clearFlow();
+                }
+                return;
+            }
+
+            // Escape: Deselect node
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                this.deselectNode();
+                return;
+            }
+
+            // F1: Show help
+            if (event.key === 'F1') {
+                event.preventDefault();
+                this.showHelp();
+                return;
+            }
+        }
+
         substituteVariables(value, variables = {}) {
             if (typeof value !== 'string') return value;
 
@@ -3993,57 +4357,71 @@
 
         async executeFlow() {
             if (this.flowNodes.length === 0) {
-                this.eventBus.emit('ui:notification', {
-                    message: 'No nodes to execute'
-                });
+                this.showMessage('No nodes to execute', 'info');
                 return;
             }
 
-            // Build execution order from connections
-            const executionOrder = this.buildExecutionOrder();
-
-            if (executionOrder.length === 0) {
-                // Execute all nodes if no connections
-                executionOrder.push(...this.flowNodes.map(n => n.id));
+            // Show loading state on execute button
+            const executeBtn = document.getElementById('flow-execute-btn');
+            if (executeBtn) {
+                executeBtn.classList.add('loading');
+                executeBtn.disabled = true;
             }
 
-            // Reset all node statuses
-            this.flowNodes.forEach(node => {
-                node.status = 'pending';
-                node.result = null;
-            });
-            this.renderNodes();
+            try {
+                // Build execution order from connections
+                const executionOrder = this.buildExecutionOrder();
 
-            // Clear variables before execution
-            this.flowVariables = {};
-            this.renderVariables();
+                if (executionOrder.length === 0) {
+                    // Execute all nodes if no connections
+                    executionOrder.push(...this.flowNodes.map(n => n.id));
+                }
 
-            // Execute nodes in order
-            const variables = {};
-            let successCount = 0;
-            let errorCount = 0;
+                // Reset all node statuses
+                this.flowNodes.forEach(node => {
+                    node.status = 'pending';
+                    node.result = null;
+                });
+                this.renderNodes();
 
-            for (const nodeId of executionOrder) {
-                const result = await this.executeNode(nodeId, variables);
+                // Clear variables before execution
+                this.flowVariables = {};
+                this.renderVariables();
 
-                if (result.success) {
-                    successCount++;
-                    // Extracted variables are automatically added to flowVariables
-                    // Update local variables for next node
-                    Object.keys(this.flowVariables).forEach(varName => {
-                        variables[varName] = this.flowVariables[varName].value;
-                    });
-                } else {
-                    errorCount++;
-                    // Stop on error
-                    break;
+                // Execute nodes in order
+                const variables = {};
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (const nodeId of executionOrder) {
+                    const result = await this.executeNode(nodeId, variables);
+
+                    if (result.success) {
+                        successCount++;
+                        // Extracted variables are automatically added to flowVariables
+                        // Update local variables for next node
+                        Object.keys(this.flowVariables).forEach(varName => {
+                            variables[varName] = this.flowVariables[varName].value;
+                        });
+                    } else {
+                        errorCount++;
+                        // Stop on error
+                        break;
+                    }
+                }
+
+                // Show notification
+                const message = errorCount === 0
+                    ? `Flow completed successfully: ${successCount} nodes executed`
+                    : `Flow completed: ${successCount} success, ${errorCount} errors`;
+                this.showMessage(message, errorCount === 0 ? 'success' : 'error');
+            } finally {
+                // Remove loading state
+                if (executeBtn) {
+                    executeBtn.classList.remove('loading');
+                    executeBtn.disabled = false;
                 }
             }
-
-            // Show notification
-            this.eventBus.emit('ui:notification', {
-                message: `Flow completed: ${successCount} success, ${errorCount} errors`
-            });
         }
 
         buildExecutionOrder() {

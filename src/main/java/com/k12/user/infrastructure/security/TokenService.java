@@ -4,6 +4,7 @@ import com.k12.user.domain.models.User;
 import com.k12.user.domain.models.UserRole;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -59,7 +60,19 @@ public class TokenService {
     private static PrivateKey getPrivateKey() {
         try {
             String keyPath = System.getenv().getOrDefault("JWT_KEY_PATH", "/app/keys/private-key.pem");
-            String keyContent = new String(Files.readAllBytes(Paths.get(keyPath)), StandardCharsets.UTF_8);
+            String keyContent;
+
+            // Try classpath first (for tests)
+            try (InputStream is =
+                    Thread.currentThread().getContextClassLoader().getResourceAsStream("keys/private-key.pem")) {
+                if (is != null) {
+                    keyContent = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                } else {
+                    // Fall back to file system
+                    keyContent = new String(Files.readAllBytes(Paths.get(keyPath)), StandardCharsets.UTF_8);
+                }
+            }
+
             keyContent = keyContent
                     .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
