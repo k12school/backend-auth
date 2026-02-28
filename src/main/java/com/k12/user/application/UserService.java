@@ -147,8 +147,95 @@ public class UserService {
     }
 
     public Result<UserResponse, UserError> getUserById(UserId id) {
-        // TODO: Implement
-        return Result.failure(UserError.PersistenceError.STORAGE_ERROR);
+        var userResult = userRepository.findById(id);
+        if (userResult.isEmpty()) {
+            return Result.failure(UserError.NotFoundError.USER_NOT_FOUND);
+        }
+
+        var user = userResult.get();
+        var role = user.userRole().iterator().next();
+
+        // Load specialization data
+        var response = new UserResponse(
+                user.userId().value().toString(),
+                user.emailAddress().value(),
+                user.name().value(),
+                role.name(),
+                user.tenantId().value(),
+                user.status().name(),
+                java.time.Instant.now(),
+                null,
+                null,
+                null);
+
+        switch (role.name()) {
+            case "TEACHER" -> {
+                var teacherResult = teacherRepository.findByUserId(id);
+                if (teacherResult.isPresent()) {
+                    var teacher = teacherResult.get();
+                    response = new UserResponse(
+                            response.userId(),
+                            response.email(),
+                            response.name(),
+                            response.role(),
+                            response.tenantId(),
+                            response.status(),
+                            response.createdAt(),
+                            new UserResponse.TeacherData(
+                                    teacher.employeeId(),
+                                    teacher.department(),
+                                    teacher.hireDate().toString()),
+                            null,
+                            null);
+                }
+            }
+            case "PARENT" -> {
+                var parentResult = parentRepository.findByUserId(id);
+                if (parentResult.isPresent()) {
+                    var parent = parentResult.get();
+                    response = new UserResponse(
+                            response.userId(),
+                            response.email(),
+                            response.name(),
+                            response.role(),
+                            response.tenantId(),
+                            response.status(),
+                            response.createdAt(),
+                            null,
+                            new UserResponse.ParentData(
+                                    parent.phoneNumber(), parent.address(), parent.emergencyContact()),
+                            null);
+                }
+            }
+            case "STUDENT" -> {
+                var studentResult = studentRepository.findByUserId(id);
+                if (studentResult.isPresent()) {
+                    var student = studentResult.get();
+                    response = new UserResponse(
+                            response.userId(),
+                            response.email(),
+                            response.name(),
+                            response.role(),
+                            response.tenantId(),
+                            response.status(),
+                            response.createdAt(),
+                            null,
+                            null,
+                            new UserResponse.StudentData(
+                                    student.studentNumber(),
+                                    student.gradeLevel(),
+                                    student.dateOfBirth().toString(),
+                                    student.guardianId() != null
+                                            ? student.guardianId()
+                                                    .value()
+                                                    .value()
+                                                    .toString()
+                                            : null));
+                }
+            }
+        }
+
+        return Result.success(response);
     }
 
     public Result<List<UserResponse>, UserError> listUsers(UserRole role, TenantId tenantId, UserStatus status) {
