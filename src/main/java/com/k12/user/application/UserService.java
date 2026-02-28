@@ -3,6 +3,7 @@ package com.k12.user.application;
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
+import com.k12.user.domain.models.User;
 import com.k12.user.domain.models.UserRole;
 import com.k12.user.domain.models.UserStatus;
 import com.k12.user.domain.models.error.UserError;
@@ -30,8 +31,113 @@ public class UserService {
     private final AdminRepository adminRepository;
 
     public Result<UserResponse, UserError> createUser(CreateUserRequest request) {
-        // TODO: Implement
-        return Result.failure(UserError.PersistenceError.STORAGE_ERROR);
+        // Check email uniqueness
+        var existingUser = userRepository.findByEmailAddress(request.email());
+        if (existingUser.isPresent()) {
+            return Result.failure(UserError.ConflictError.EMAIL_ALREADY_EXISTS);
+        }
+
+        // Hash password
+        String passwordHash = com.k12.user.infrastructure.security.PasswordHasher.hash(request.password())
+                .value();
+
+        // Create base User via UserFactory
+        var tenantId = new TenantId("00000000-0000-0000-0000-000000000001"); // From JWT in real implementation
+        var userId = UserId.generate();
+
+        var userResult = com.k12.user.domain.models.UserFactory.create(
+                com.k12.user.domain.models.EmailAddress.of(request.email()),
+                new com.k12.user.domain.models.PasswordHash(passwordHash),
+                java.util.Set.of(com.k12.user.domain.models.UserRole.valueOf(
+                        request.role().value())),
+                com.k12.user.domain.models.UserName.of(request.name()),
+                tenantId);
+
+        if (userResult.isFailure()) {
+            return Result.failure(UserError.ValidationError.INVALID_VALUE);
+        }
+
+        var userCreatedEvent = userResult.get();
+        var user = com.k12.user.domain.models.UserReconstructor.applyEvent(null, userCreatedEvent);
+
+        // Create specialization based on role
+        switch (request.role().value()) {
+            case "TEACHER" -> createTeacher(userId, request.teacherData());
+            case "PARENT" -> createParent(userId, request.parentData());
+            case "STUDENT" -> createStudent(userId, request.studentData());
+            case "ADMIN" -> createAdmin(userId);
+        }
+
+        // Save user
+        userRepository.save(user);
+
+        // Build response
+        return Result.success(buildUserResponse(user, request));
+    }
+
+    private void createTeacher(UserId userId, CreateUserRequest.TeacherData data) {
+        var teacher = com.k12.user.domain.models.specialization.teacher.TeacherFactory.create(
+                userId, data.employeeId(), data.department(), java.time.LocalDate.parse(data.hireDate()));
+        teacherRepository.save(teacher);
+    }
+
+    private void createParent(UserId userId, CreateUserRequest.ParentData data) {
+        var parent = com.k12.user.domain.models.specialization.parent.ParentFactory.create(
+                userId, data.phoneNumber(), data.address(), data.emergencyContact());
+        parentRepository.save(parent);
+    }
+
+    private void createStudent(UserId userId, CreateUserRequest.StudentData data) {
+        var guardianId = data.guardianId() != null
+                ? new com.k12.user.domain.models.specialization.parent.ParentId(
+                        new com.k12.common.domain.model.UserId(java.util.UUID.fromString(data.guardianId())))
+                : null;
+
+        var student = com.k12.user.domain.models.specialization.student.StudentFactory.create(
+                userId,
+                data.studentNumber(),
+                data.gradeLevel(),
+                java.time.LocalDate.parse(data.dateOfBirth()),
+                guardianId);
+        studentRepository.save(student);
+    }
+
+    private void createAdmin(UserId userId) {
+        var admin = com.k12.user.domain.models.specialization.admin.AdminFactory.create(
+                new com.k12.user.domain.models.specialization.admin.AdminId(userId),
+                java.util.Set.of(
+                        com.k12.user.domain.models.specialization.admin.valueobjects.Permission.USER_MANAGEMENT));
+        adminRepository.save(admin);
+    }
+
+    private UserResponse buildUserResponse(User user, CreateUserRequest request) {
+        return new UserResponse(
+                user.userId().value().toString(),
+                user.emailAddress().value(),
+                user.name().value(),
+                user.userRole().iterator().next().name(),
+                user.tenantId().value().toString(),
+                user.status().name(),
+                java.time.Instant.now(), // createdAt - will be set by repository
+                request.teacherData() != null
+                        ? new UserResponse.TeacherData(
+                                request.teacherData().employeeId(),
+                                request.teacherData().department(),
+                                request.teacherData().hireDate())
+                        : null,
+                request.parentData() != null
+                        ? new UserResponse.ParentData(
+                                request.parentData().phoneNumber(),
+                                request.parentData().address(),
+                                request.parentData().emergencyContact())
+                        : null,
+                request.studentData() != null
+                        ? new UserResponse.StudentData(
+                                request.studentData().studentNumber(),
+                                request.studentData().gradeLevel(),
+                                request.studentData().dateOfBirth(),
+                                request.studentData().guardianId())
+                        : null);
     }
 
     public Result<UserResponse, UserError> getUserById(UserId id) {
