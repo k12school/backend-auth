@@ -3912,6 +3912,85 @@
             URL.revokeObjectURL(url);
         }
 
+        substituteVariables(value, variables = {}) {
+            if (typeof value !== 'string') return value;
+
+            // Merge flow variables with provided variables
+            const allVars = { ...this.flowVariables, ...variables };
+
+            // Replace {{variable_name}} patterns
+            return value.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
+                if (varName in allVars) {
+                    const val = allVars[varName].value;
+                    return val !== undefined ? val : match;
+                }
+                return match;
+            });
+        }
+
+        substituteInObject(obj, variables = {}) {
+            if (typeof obj !== 'object' || obj === null) return obj;
+
+            if (Array.isArray(obj)) {
+                return obj.map(item => this.substituteInObject(item, variables));
+            }
+
+            const result = {};
+            for (const key in obj) {
+                const value = obj[key];
+                if (typeof value === 'string') {
+                    result[key] = this.substituteVariables(value, variables);
+                } else if (typeof value === 'object') {
+                    result[key] = this.substituteInObject(value, variables);
+                } else {
+                    result[key] = value;
+                }
+            }
+
+            return result;
+        }
+
+        extractValueFromResponse(response, jsonPath) {
+            try {
+                // Parse JSONPath like "response.token" or "response.data.user.id"
+                const parts = jsonPath.split('.');
+                let value = response;
+
+                for (const part of parts) {
+                    if (part === 'response') continue;
+                    if (value && typeof value === 'object' && part in value) {
+                        value = value[part];
+                    } else {
+                        return null;
+                    }
+                }
+
+                return value;
+            } catch (error) {
+                console.error('Failed to extract value:', error);
+                return null;
+            }
+        }
+
+        extractVariables(node, response) {
+            const extract = node.config.extract || [];
+
+            extract.forEach(ext => {
+                if (!ext.path || !ext.as) return;
+
+                const value = this.extractValueFromResponse(response, ext.path);
+                if (value !== null && value !== undefined) {
+                    this.flowVariables[ext.as] = {
+                        value: value,
+                        source: `${node.method} ${node.path} → ${ext.path}`,
+                        nodeId: node.id
+                    };
+                }
+            });
+
+            this.renderVariables();
+        }
+
         executeFlow() {
             // Will be implemented in later tasks
             console.log('Executing flow...');
