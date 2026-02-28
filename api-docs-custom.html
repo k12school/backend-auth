@@ -859,6 +859,7 @@
                 <button id="theme-toggle" class="btn-icon" title="Toggle theme">🌙</button>
                 <button id="help-toggle" class="btn-icon" title="Help">?</button>
                 <button id="mobile-toggle" class="btn">Try It Panel</button>
+                <button id="test-flow-tab-btn" class="tab-btn">Test Flow</button>
             </div>
         </header>
 
@@ -997,6 +998,65 @@
                             <div id="favorites-list"></div>
                             <button class="btn btn-ghost btn-sm mt-4" onclick="app.uiManager.saveAsFavorite()">+ Save Current as Favorite</button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Flow Panel -->
+            <div id="test-flow-panel" class="test-flow-panel" style="display: none;">
+                <!-- Panel Header -->
+                <div class="panel-header">
+                    <div class="panel-title">Test Flow</div>
+                    <div class="flow-actions">
+                        <button id="flow-execute-btn" class="btn">▶ Execute Flow</button>
+                        <button id="flow-save-btn" class="btn">Save</button>
+                        <button id="flow-export-btn" class="btn btn-ghost">Export</button>
+                        <button id="flow-clear-btn" class="btn btn-ghost">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Panel Content -->
+                <div class="test-flow-content">
+                    <!-- Left Sidebar: Endpoint Library -->
+                    <div class="flow-sidebar">
+                        <div class="sidebar-header">
+                            <h3>Endpoints</h3>
+                            <input type="text" id="endpoint-search" placeholder="Search..." class="search-input">
+                        </div>
+                        <div id="endpoint-library" class="endpoint-library">
+                            <!-- Endpoints will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Center: Canvas -->
+                    <div class="flow-canvas-container">
+                        <div id="flow-canvas" class="flow-canvas">
+                            <!-- Nodes will be rendered here -->
+                        </div>
+                        <!-- SVG layer for connections -->
+                        <svg id="flow-connections" class="flow-connections"></svg>
+                    </div>
+
+                    <!-- Right Sidebar: Node Config -->
+                    <div class="flow-config-panel">
+                        <div class="config-header">
+                            <h3>Node Configuration</h3>
+                            <button id="close-config-btn" class="btn btn-ghost btn-sm">×</button>
+                        </div>
+                        <div id="node-config-content" class="config-content">
+                            <p class="text-muted">Select a node to configure</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Variables Panel (Floating) -->
+                <div id="variables-panel" class="variables-panel">
+                    <div class="panel-header">
+                        <span>Variables</span>
+                        <button id="toggle-vars-btn" class="btn btn-ghost btn-sm">▼</button>
+                    </div>
+                    <div id="variables-list" class="variables-list">
+                        <p class="text-muted">No variables yet</p>
                     </div>
                 </div>
             </div>
