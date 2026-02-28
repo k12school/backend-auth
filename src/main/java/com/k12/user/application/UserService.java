@@ -24,6 +24,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class UserService {
 
+    /**
+     * Default tenant ID used for user creation.
+     * TODO: Extract from JWT token in production when implementing multi-tenant authentication
+     */
+    private static final String DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+
     private final UserRepository userRepository;
     private final TeacherRepository teacherRepository;
     private final ParentRepository parentRepository;
@@ -42,7 +48,7 @@ public class UserService {
                 .value();
 
         // Create base User via UserFactory
-        var tenantId = new TenantId("00000000-0000-0000-0000-000000000001"); // From JWT in real implementation
+        var tenantId = new TenantId(DEFAULT_TENANT_ID);
         var userId = UserId.generate();
 
         var userResult = com.k12.user.domain.models.UserFactory.create(
@@ -54,7 +60,7 @@ public class UserService {
                 tenantId);
 
         if (userResult.isFailure()) {
-            return Result.failure(UserError.ValidationError.INVALID_VALUE);
+            return Result.failure(userResult.getError());
         }
 
         var userCreatedEvent = userResult.get();

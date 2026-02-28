@@ -96,4 +96,102 @@ class UserServiceTest {
         verify(userRepository, never()).save(any());
         verify(teacherRepository, never()).save(any());
     }
+
+    @Test
+    void createUser_withParentRole_shouldSucceed() {
+        // Arrange
+        var request = new CreateUserRequest(
+                "parent@example.com",
+                "password123",
+                "Jane Parent",
+                new CreateUserRequest.UserRole("PARENT"),
+                null,
+                new CreateUserRequest.ParentData("+1234567890", "123 Main St", "Emergency Contact"),
+                null);
+
+        when(userRepository.findByEmailAddress("parent@example.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        var result = userService.createUser(request);
+
+        // Assert
+        assertTrue(result.isSuccess());
+        UserResponse response = result.get();
+        assertEquals("parent@example.com", response.email());
+        assertEquals("Jane Parent", response.name());
+        assertEquals("PARENT", response.role());
+        assertEquals("+1234567890", response.parent().phoneNumber());
+        assertEquals("123 Main St", response.parent().address());
+        assertEquals("Emergency Contact", response.parent().emergencyContact());
+
+        verify(userRepository).findByEmailAddress("parent@example.com");
+        verify(userRepository).save(any(User.class));
+        verify(parentRepository).save(any());
+    }
+
+    @Test
+    void createUser_withStudentRole_shouldSucceed() {
+        // Arrange
+        var request = new CreateUserRequest(
+                "student@example.com",
+                "password123",
+                "John Student",
+                new CreateUserRequest.UserRole("STUDENT"),
+                null,
+                null,
+                new CreateUserRequest.StudentData("STU001", "GRADE_10", "2010-05-15", null));
+
+        when(userRepository.findByEmailAddress("student@example.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        var result = userService.createUser(request);
+
+        // Assert
+        assertTrue(result.isSuccess());
+        UserResponse response = result.get();
+        assertEquals("student@example.com", response.email());
+        assertEquals("John Student", response.name());
+        assertEquals("STUDENT", response.role());
+        assertEquals("STU001", response.student().studentNumber());
+        assertEquals("GRADE_10", response.student().gradeLevel());
+        assertEquals("2010-05-15", response.student().dateOfBirth());
+        assertNull(response.student().guardianId());
+
+        verify(userRepository).findByEmailAddress("student@example.com");
+        verify(userRepository).save(any(User.class));
+        verify(studentRepository).save(any());
+    }
+
+    @Test
+    void createUser_withAdminRole_shouldSucceed() {
+        // Arrange
+        var request = new CreateUserRequest(
+                "admin@example.com",
+                "password123",
+                "System Admin",
+                new CreateUserRequest.UserRole("ADMIN"),
+                null,
+                null,
+                null);
+
+        when(userRepository.findByEmailAddress("admin@example.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        var result = userService.createUser(request);
+
+        // Assert
+        assertTrue(result.isSuccess());
+        UserResponse response = result.get();
+        assertEquals("admin@example.com", response.email());
+        assertEquals("System Admin", response.name());
+        assertEquals("ADMIN", response.role());
+        // Admin specialization data is not returned in UserResponse
+
+        verify(userRepository).findByEmailAddress("admin@example.com");
+        verify(userRepository).save(any(User.class));
+        verify(adminRepository).save(any());
+    }
 }
