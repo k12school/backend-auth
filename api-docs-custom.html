@@ -3319,7 +3319,15 @@
         }
 
         populateRequestBuilder(endpointInfo) {
-            const { method, path, parameters, requestBody } = endpointInfo;
+            const { method, path, parameters, requestBody, sectionId } = endpointInfo;
+
+            // Store endpoint for TestFlowManager
+            const endpoints = this.stateManager.get('endpoints') || [];
+            const endpointExists = endpoints.some(ep => ep.method === method && ep.path === path);
+            if (!endpointExists) {
+                endpoints.push({ method, path, tag: this.extractTagFromSectionId(sectionId) });
+                this.stateManager.set('endpoints', endpoints);
+            }
 
             // Store original URL with placeholders for path parameters
             this.stateManager.set('request.originalUrl', path);
@@ -3435,6 +3443,12 @@
             }
         }
 
+        extractTagFromSectionId(sectionId) {
+            // Parse: "tag/Authentication/paths/~1api~1auth~1login/post"
+            const match = sectionId.match(/tag\/([^\/]+)/);
+            return match ? match[1].replace(/-/g, ' ') : 'Other';
+        }
+
         destroy() {
             // Clear highlight timeout to prevent orphaned callbacks
             if (this.highlightTimeout) {
@@ -3459,6 +3473,332 @@
     }
 
     // ============================================
+    // TEST FLOW MANAGER
+    // ============================================
+
+    class TestFlowManager {
+        constructor(eventBus, stateManager, requestManager) {
+            this.eventBus = eventBus;
+            this.stateManager = stateManager;
+            this.requestManager = requestManager;
+
+            // Flow state
+            this.flowNodes = [];
+            this.flowConnections = [];
+            this.flowVariables = {};
+            this.selectedNodeId = null;
+            this.draggedNodeId = null;
+
+            // Canvas state
+            this.canvasOffset = { x: 0, y: 0 };
+            this.isDraggingCanvas = false;
+            this.lastMousePos = { x: 0, y: 0 };
+
+            // DOM elements
+            this.canvas = null;
+            this.connectionsSvg = null;
+            this.endpointLibrary = null;
+            this.configContent = null;
+
+            // Initialize
+            this.init();
+        }
+
+        init() {
+            // Cache DOM elements
+            this.canvas = document.getElementById('flow-canvas');
+            this.connectionsSvg = document.getElementById('flow-connections');
+            this.endpointLibrary = document.getElementById('endpoint-library');
+            this.configContent = document.getElementById('node-config-content');
+
+            // Set up event listeners
+            this.setupEventListeners();
+
+            // Load saved flow or create empty
+            this.loadFlow();
+
+            console.log('TestFlowManager initialized');
+        }
+
+        setupEventListeners() {
+            // Tab button
+            const tabBtn = document.getElementById('test-flow-tab-btn');
+            if (tabBtn) {
+                tabBtn.addEventListener('click', () => this.showPanel());
+            }
+
+            // Execute button
+            const executeBtn = document.getElementById('flow-execute-btn');
+            if (executeBtn) {
+                executeBtn.addEventListener('click', () => this.executeFlow());
+            }
+
+            // Save button
+            const saveBtn = document.getElementById('flow-save-btn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => this.saveFlow());
+            }
+
+            // Clear button
+            const clearBtn = document.getElementById('flow-clear-btn');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => this.clearFlow());
+            }
+
+            // Export button
+            const exportBtn = document.getElementById('flow-export-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', () => this.exportFlow());
+            }
+
+            // Close config button
+            const closeConfigBtn = document.getElementById('close-config-btn');
+            if (closeConfigBtn) {
+                closeConfigBtn.addEventListener('click', () => this.deselectNode());
+            }
+
+            // Search input
+            const searchInput = document.getElementById('endpoint-search');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => this.filterEndpoints(e.target.value));
+            }
+
+            // Canvas drag (for panning)
+            if (this.canvas) {
+                this.canvas.addEventListener('mousedown', (e) => this.onCanvasMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.onCanvasMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.onCanvasMouseUp(e));
+            }
+        }
+
+        showPanel() {
+            // Hide try panel, show test flow panel
+            document.getElementById('try-panel').style.display = 'none';
+            document.getElementById('test-flow-panel').style.display = 'flex';
+
+            // Render endpoint library and nodes
+            this.renderEndpointLibrary();
+            this.renderNodes();
+            this.renderConnections();
+            this.renderVariables();
+        }
+
+        hidePanel() {
+            document.getElementById('test-flow-panel').style.display = 'none';
+            document.getElementById('try-panel').style.display = 'flex';
+        }
+
+        renderEndpointLibrary() {
+            if (!this.endpointLibrary) return;
+
+            // Get all endpoints from the state
+            const endpoints = this.stateManager.get('endpoints') || [];
+
+            // Group by tag
+            const grouped = {};
+            endpoints.forEach(ep => {
+                const tag = ep.tag || 'Other';
+                if (!grouped[tag]) grouped[tag] = [];
+                grouped[tag].push(ep);
+            });
+
+            // Render
+            let html = '';
+            Object.keys(grouped).sort().forEach(tag => {
+                html += `
+                    <div class="endpoint-category">
+                        <div class="endpoint-category-title">${tag}</div>
+                        ${grouped[tag].map(ep => `
+                            <div class="endpoint-item"
+                                 data-method="${ep.method}"
+                                 data-path="${ep.path}"
+                                 draggable="true">
+                                <span class="endpoint-method">${ep.method}</span>
+                                <span class="endpoint-path">${ep.path}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            });
+
+            this.endpointLibrary.innerHTML = html;
+
+            // Set up drag handlers
+            this.endpointLibrary.querySelectorAll('.endpoint-item').forEach(item => {
+                item.addEventListener('dragstart', (e) => this.onEndpointDragStart(e));
+            });
+        }
+
+        renderNodes() {
+            // Will be implemented in next task
+            console.log('Rendering nodes:', this.flowNodes.length);
+        }
+
+        renderConnections() {
+            // Will be implemented in next task
+            console.log('Rendering connections:', this.flowConnections.length);
+        }
+
+        renderVariables() {
+            const varsList = document.getElementById('variables-list');
+            if (!varsList) return;
+
+            const varNames = Object.keys(this.flowVariables);
+            if (varNames.length === 0) {
+                varsList.innerHTML = '<p class="text-muted">No variables yet</p>';
+                return;
+            }
+
+            varsList.innerHTML = varNames.map(name => {
+                const variable = this.flowVariables[name];
+                return `
+                    <div class="variable-item">
+                        <span class="variable-name">{{${name}}}</span>
+                        <div class="variable-value">
+                            <div>${this.maskValue(variable.value)}</div>
+                            ${variable.source ? `<div class="variable-source">From: ${variable.source}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        maskValue(value) {
+            if (!value) return '';
+            if (typeof value === 'string' && value.length > 20) {
+                return value.substring(0, 20) + '...';
+            }
+            return String(value);
+        }
+
+        onEndpointDragStart(e) {
+            e.dataTransfer.setData('application/json', JSON.stringify({
+                method: e.target.dataset.method,
+                path: e.target.dataset.path
+            }));
+        }
+
+        addNode(method, path, x = 100, y = 100) {
+            const node = {
+                id: 'node-' + Date.now(),
+                method,
+                path,
+                x,
+                y,
+                config: {
+                    pathParams: [],
+                    queryParams: [],
+                    headers: [],
+                    body: '',
+                    extract: []
+                },
+                status: 'pending',
+                result: null
+            };
+
+            this.flowNodes.push(node);
+            this.renderNodes();
+            this.saveFlow();
+
+            return node;
+        }
+
+        loadFlow() {
+            try {
+                const saved = localStorage.getItem('test-flow');
+                if (saved) {
+                    const flow = JSON.parse(saved);
+                    this.flowNodes = flow.nodes || [];
+                    this.flowConnections = flow.connections || [];
+                    this.flowVariables = flow.variables || {};
+                }
+            } catch (error) {
+                console.error('Failed to load test flow:', error);
+            }
+        }
+
+        saveFlow() {
+            try {
+                const flow = {
+                    nodes: this.flowNodes,
+                    connections: this.flowConnections,
+                    variables: this.flowVariables
+                };
+                localStorage.setItem('test-flow', JSON.stringify(flow));
+                console.log('Test flow saved');
+            } catch (error) {
+                console.error('Failed to save test flow:', error);
+            }
+        }
+
+        clearFlow() {
+            this.flowNodes = [];
+            this.flowConnections = [];
+            this.flowVariables = {};
+            this.renderNodes();
+            this.renderConnections();
+            this.renderVariables();
+            this.saveFlow();
+        }
+
+        exportFlow() {
+            const flow = {
+                nodes: this.flowNodes,
+                connections: this.flowConnections,
+                variables: this.flowVariables
+            };
+
+            const blob = new Blob([JSON.stringify(flow, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'test-flow.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        executeFlow() {
+            // Will be implemented in later tasks
+            console.log('Executing flow...');
+        }
+
+        // Canvas event handlers (stubs)
+        onCanvasMouseDown(e) {}
+        onCanvasMouseMove(e) {}
+        onCanvasMouseUp(e) {}
+
+        // Node selection
+        selectNode(nodeId) {
+            this.selectedNodeId = nodeId;
+            this.renderNodes();
+            this.renderNodeConfig(nodeId);
+        }
+
+        deselectNode() {
+            this.selectedNodeId = null;
+            this.renderNodes();
+            this.configContent.innerHTML = '<p class="text-muted">Select a node to configure</p>';
+        }
+
+        renderNodeConfig(nodeId) {
+            // Will be implemented in next task
+            console.log('Render config for node:', nodeId);
+        }
+
+        filterEndpoints(query) {
+            const items = this.endpointLibrary.querySelectorAll('.endpoint-item');
+            const q = query.toLowerCase();
+
+            items.forEach(item => {
+                const path = item.dataset.path.toLowerCase();
+                const method = item.dataset.method.toLowerCase();
+                const match = path.includes(q) || method.includes(q);
+                item.style.display = match ? 'flex' : 'none';
+            });
+        }
+    }
+
+    // ============================================
     // APPLICATION INITIALIZATION
     // ============================================
 
@@ -3477,6 +3817,9 @@
 
             // Initialize RedocIntegrator
             this.redocIntegrator = new RedocIntegrator(this.eventBus, this.stateManager, this.uiManager);
+
+            // Initialize TestFlowManager
+            this.testFlowManager = new TestFlowManager(this.eventBus, this.stateManager, this.requestManager);
 
             // Wire up request sending
             this.eventBus.on('request:send', () => this.requestManager.sendRequest());
