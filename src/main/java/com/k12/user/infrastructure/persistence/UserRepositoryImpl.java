@@ -7,6 +7,7 @@ import com.k12.backend.infrastructure.jooq.public_.tables.records.UserEventsReco
 import com.k12.common.domain.model.Result;
 import com.k12.common.domain.model.UserId;
 import com.k12.tenant.infrastructure.persistence.KryoEventSerializer;
+import com.k12.tenant.infrastructure.persistence.KryoEventSerializer.SerializationException;
 import com.k12.user.domain.models.EmailAddress;
 import com.k12.user.domain.models.PasswordHash;
 import com.k12.user.domain.models.User;
@@ -16,9 +17,14 @@ import com.k12.user.domain.models.UserRole;
 import com.k12.user.domain.models.UserStatus;
 import com.k12.user.domain.models.error.UserError;
 import com.k12.user.domain.models.events.UserEvents;
+import com.k12.user.domain.models.events.UserEvents.UserCreated;
 import com.k12.user.domain.ports.out.UserRepository;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -40,8 +46,86 @@ public class UserRepositoryImpl implements UserRepository {
     private final AgroalDataSource dataSource;
 
     @Override
+    @Transactional
     public User save(User user) {
-        throw new UnsupportedOperationException("User saving not yet implemented");
+        DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+
+        try {
+            // Convert immutable Set to HashSet for Kryo serialization
+            Set<UserRole> roles = new HashSet<>(user.userRole());
+
+            // Create UserCreated event from the User aggregate
+            UserCreated event = new UserEvents.UserCreated(
+                    user.userId(),
+                    user.emailAddress(),
+                    user.passwordHash(),
+                    roles,
+                    user.status(),
+                    user.name(),
+                    Instant.now(),
+                    1L);
+
+            // Serialize the event
+            byte[] eventData = KryoEventSerializer.serializeUserEvent(event);
+
+            // Save event to event store
+            ctx.insertInto(
+                            USER_EVENTS,
+                            USER_EVENTS.USER_ID,
+                            USER_EVENTS.EVENT_TYPE,
+                            USER_EVENTS.EVENT_DATA,
+                            USER_EVENTS.VERSION,
+                            USER_EVENTS.OCCURRED_AT,
+                            USER_EVENTS.CREATED_AT)
+                    .values(
+                            event.userId().value(),
+                            "UserCreated",
+                            eventData,
+                            event.version(),
+                            OffsetDateTime.ofInstant(event.createdAt(), ZoneOffset.UTC),
+                            OffsetDateTime.ofInstant(Instant.now(), ZoneOffset.UTC))
+                    .execute();
+
+            // Update projection table for queries
+            String rolesString = user.userRole().stream()
+                    .map(Enum::name)
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse("");
+
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+            ctx.insertInto(
+                            USERS,
+                            USERS.ID,
+                            USERS.EMAIL,
+                            USERS.PASSWORD_HASH,
+                            USERS.ROLES,
+                            USERS.STATUS,
+                            USERS.NAME,
+                            USERS.CREATED_AT,
+                            USERS.UPDATED_AT)
+                    .values(
+                            user.userId().value(),
+                            user.emailAddress().value(),
+                            user.passwordHash().value(),
+                            rolesString,
+                            user.status().name(),
+                            user.name().value(),
+                            now,
+                            now)
+                    .onConflict(USERS.ID)
+                    .doUpdate()
+                    .set(USERS.EMAIL, user.emailAddress().value())
+                    .set(USERS.ROLES, rolesString)
+                    .set(USERS.STATUS, user.status().name())
+                    .set(USERS.NAME, user.name().value())
+                    .set(USERS.UPDATED_AT, now)
+                    .execute();
+
+            return user;
+        } catch (SerializationException e) {
+            throw new RuntimeException("Failed to serialize user event", e);
+        }
     }
 
     @Override

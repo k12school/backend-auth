@@ -145,6 +145,25 @@ public final class KryoEventSerializer {
     }
 
     /**
+     * Serialize a User event to Kryo format.
+     * Creates a separate Kryo instance configured for User domain events.
+     *
+     * @param event the User event to serialize
+     * @return serialized byte array
+     */
+    public static byte[] serializeUserEvent(com.k12.user.domain.models.events.UserEvents event) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                Output output = new Output(baos)) {
+            Kryo kryo = createUserEventKryo();
+            kryo.writeClassAndObject(output, event);
+            output.flush();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new SerializationException("Failed to serialize User event: " + event, e);
+        }
+    }
+
+    /**
      * Deserialize a User event from Kryo format.
      * Creates a separate Kryo instance configured for User domain events.
      *
@@ -205,9 +224,24 @@ public final class KryoEventSerializer {
         kryo.register(com.k12.user.domain.models.events.UserEvents.UserRoleRemoved.class, classId++);
         kryo.register(com.k12.user.domain.models.events.UserEvents.UserNameUpdated.class, classId++);
 
+        // Register Java immutable collections (used by Set.of(), List.of(), etc.)
+        // Use JavaSerializer for these as they're complex internal classes
+        try {
+            kryo.register(Class.forName("java.util.ImmutableCollections$SetN"), new JavaSerializer());
+            kryo.register(Class.forName("java.util.ImmutableCollections$Set12"), new JavaSerializer());
+            kryo.register(Class.forName("java.util.ImmutableCollections$SetN$1"), new JavaSerializer());
+            kryo.register(Class.forName("java.util.ImmutableCollections$ListN"), new JavaSerializer());
+            kryo.register(Class.forName("java.util.ImmutableCollections$List12"), new JavaSerializer());
+            kryo.register(Class.forName("java.util.ImmutableCollections$MapN"), new JavaSerializer());
+            kryo.register(Class.forName("java.util.ImmutableCollections$Map1"), new JavaSerializer());
+            kryo.register(Class.forName("java.util.ImmutableCollections$SubList"), new JavaSerializer());
+        } catch (ClassNotFoundException e) {
+            // These classes may not be available in all Java versions
+        }
+
         // Configure settings
         kryo.setReferences(false);
-        kryo.setRegistrationRequired(true);
+        kryo.setRegistrationRequired(false); // Allow unregistered classes for immutable collections
 
         return kryo;
     }
