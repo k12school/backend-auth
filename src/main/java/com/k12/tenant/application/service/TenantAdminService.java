@@ -112,7 +112,7 @@ public class TenantAdminService {
 
             // Step 5: Create User with ADMIN role
             Result<UserEvents, UserError> userResult =
-                    UserFactory.create(emailAddress, passwordHash, Set.of(UserRole.ADMIN), userName);
+                    UserFactory.create(emailAddress, passwordHash, Set.of(UserRole.ADMIN), userName, tenantId);
 
             if (userResult.isFailure()) {
                 log.error("User creation failed");

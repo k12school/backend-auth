@@ -210,6 +210,7 @@ public final class KryoEventSerializer {
         kryo.register(com.k12.user.domain.models.UserName.class);
         kryo.register(com.k12.user.domain.models.UserRole.class);
         kryo.register(com.k12.user.domain.models.UserStatus.class);
+        kryo.register(com.k12.common.domain.model.TenantId.class);
         kryo.register(java.util.HashSet.class);
         kryo.register(java.util.ArrayList.class);
 

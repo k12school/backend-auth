@@ -4064,8 +4064,199 @@
         }
 
         renderNodeConfig(nodeId) {
-            // Will be implemented in next task
-            console.log('Render config for node:', nodeId);
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            const config = node.config;
+
+            this.configContent.innerHTML = `
+                <div class="config-section">
+                    <div class="config-section-title">Endpoint</div>
+                    <div class="config-field">
+                        <label>Method</label>
+                        <input type="text" value="${node.method}" readonly>
+                    </div>
+                    <div class="config-field">
+                        <label>Path</label>
+                        <input type="text" value="${node.path}" readonly>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <div class="config-section-title">Path Parameters</div>
+                    <div id="config-path-params"></div>
+                </div>
+
+                <div class="config-section">
+                    <div class="config-section-title">Query Parameters</div>
+                    <div id="config-query-params"></div>
+                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.addConfigQueryParam('${nodeId}')">+ Add Parameter</button>
+                </div>
+
+                <div class="config-section">
+                    <div class="config-section-title">Headers</div>
+                    <div id="config-headers"></div>
+                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.addConfigHeader('${nodeId}')">+ Add Header</button>
+                </div>
+
+                ${['POST', 'PUT', 'PATCH'].includes(node.method) ? `
+                <div class="config-section">
+                    <div class="config-section-title">Request Body</div>
+                    <div class="config-field">
+                        <textarea id="config-body" placeholder='{"key": "value"}'>${config.body || ''}</textarea>
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="config-section">
+                    <div class="config-section-title">Variable Extraction</div>
+                    <div id="config-extract"></div>
+                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.addConfigExtract('${nodeId}')">+ Add Extraction</button>
+                    <p class="text-muted" style="font-size: 12px; margin-top: 8px;">
+                        Use JSONPath: response.token, response.data.id
+                    </p>
+                </div>
+
+                <div class="config-section">
+                    <button class="btn" onclick="app.apiConsole.testFlowManager.saveNodeConfig('${nodeId}')">Save Configuration</button>
+                </div>
+            `;
+
+            // Render path params
+            this.renderConfigPathParams(nodeId);
+
+            // Render query params
+            this.renderConfigQueryParams(nodeId);
+
+            // Render headers
+            this.renderConfigHeaders(nodeId);
+
+            // Render extractions
+            this.renderConfigExtract(nodeId);
+
+            // Set up body change listener
+            const bodyTextarea = document.getElementById('config-body');
+            if (bodyTextarea) {
+                bodyTextarea.addEventListener('input', (e) => {
+                    const node = this.flowNodes.find(n => n.id === nodeId);
+                    if (node) node.config.body = e.target.value;
+                });
+            }
+        }
+
+        renderConfigPathParams(nodeId) {
+            const container = document.getElementById('config-path-params');
+            if (!container) return;
+
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            // Extract path params from endpoint path
+            const pathParams = this.extractPathParams(node.path);
+            const params = node.config.pathParams || [];
+
+            if (pathParams.length === 0) {
+                container.innerHTML = '<p class="text-muted">No path parameters</p>';
+                return;
+            }
+
+            container.innerHTML = pathParams.map(param => {
+                const saved = params.find(p => p.name === param.name);
+                return `
+                    <div class="kv-row">
+                        <input type="text" value="${param.name}" readonly style="background: var(--bg-tertiary);">
+                        <input type="text"
+                               placeholder="Value or {{variable}}"
+                               value="${saved ? saved.value : ''}"
+                               onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'pathParams', '${param.name}', 'value', this.value)">
+                    </div>
+                `;
+            }).join('');
+        }
+
+        renderConfigQueryParams(nodeId) {
+            const container = document.getElementById('config-query-params');
+            if (!container) return;
+
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            const params = node.config.queryParams || [];
+
+            if (params.length === 0) {
+                container.innerHTML = '<p class="text-muted">No query parameters</p>';
+                return;
+            }
+
+            container.innerHTML = params.map((param, index) => `
+                <div class="kv-row">
+                    <input type="text" placeholder="Key" value="${param.key || ''}"
+                           onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'queryParams', ${index}, 'key', this.value)">
+                    <input type="text" placeholder="Value or {{variable}}" value="${param.value || ''}"
+                           onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'queryParams', ${index}, 'value', this.value)">
+                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.removeConfigParam('${nodeId}', 'queryParams', ${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        renderConfigHeaders(nodeId) {
+            const container = document.getElementById('config-headers');
+            if (!container) return;
+
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            const headers = node.config.headers || [];
+
+            if (headers.length === 0) {
+                container.innerHTML = '<p class="text-muted">No headers</p>';
+                return;
+            }
+
+            container.innerHTML = headers.map((header, index) => `
+                <div class="kv-row">
+                    <input type="text" placeholder="Header name" value="${header.key || ''}"
+                           onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'headers', ${index}, 'key', this.value)">
+                    <input type="text" placeholder="Value or {{variable}}" value="${header.value || ''}"
+                           onchange="app.apiConsole.testFlowManager.updateConfigParam('${nodeId}', 'headers', ${index}, 'value', this.value)">
+                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.removeConfigParam('${nodeId}', 'headers', ${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        renderConfigExtract(nodeId) {
+            const container = document.getElementById('config-extract');
+            if (!container) return;
+
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            const extract = node.config.extract || [];
+
+            if (extract.length === 0) {
+                container.innerHTML = '<p class="text-muted">No extractions configured</p>';
+                return;
+            }
+
+            container.innerHTML = extract.map((ext, index) => `
+                <div class="kv-row">
+                    <input type="text" placeholder="response.path" value="${ext.path || ''}"
+                           onchange="app.apiConsole.testFlowManager.updateConfigExtract('${nodeId}', ${index}, 'path', this.value)">
+                    <span style="padding: 6px;">→</span>
+                    <input type="text" placeholder="variable_name" value="${ext.as || ''}"
+                           onchange="app.apiConsole.testFlowManager.updateConfigExtract('${nodeId}', ${index}, 'as', this.value)">
+                    <button class="btn btn-ghost btn-sm" onclick="app.apiConsole.testFlowManager.removeConfigExtract('${nodeId}', ${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        extractPathParams(path) {
+            const matches = path.match(/\{([^}]+)\}/g);
+            if (!matches) return [];
+
+            return matches.map(m => ({
+                name: m.slice(1, -1)
+            }));
         }
 
         // Placeholder methods for next task (connections)
@@ -4180,6 +4371,90 @@
                 const method = item.dataset.method.toLowerCase();
                 const match = path.includes(q) || method.includes(q);
                 item.style.display = match ? 'flex' : 'none';
+            });
+        }
+
+        addConfigQueryParam(nodeId) {
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            if (!node.config.queryParams) node.config.queryParams = [];
+            node.config.queryParams.push({ key: '', value: '' });
+
+            this.renderConfigQueryParams(nodeId);
+        }
+
+        addConfigHeader(nodeId) {
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            if (!node.config.headers) node.config.headers = [];
+            node.config.headers.push({ key: '', value: '' });
+
+            this.renderConfigHeaders(nodeId);
+        }
+
+        addConfigExtract(nodeId) {
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            if (!node.config.extract) node.config.extract = [];
+            node.config.extract.push({ path: '', as: '' });
+
+            this.renderConfigExtract(nodeId);
+        }
+
+        updateConfigParam(nodeId, type, index, field, value) {
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            if (type === 'pathParams') {
+                // pathParams uses name as identifier
+                if (!node.config.pathParams) node.config.pathParams = [];
+                const existing = node.config.pathParams.find(p => p.name === index);
+                if (existing) {
+                    existing[field] = value;
+                } else {
+                    node.config.pathParams.push({ name: index, [field]: value });
+                }
+            } else {
+                // queryParams and headers use numeric index
+                if (!node.config[type]) node.config[type] = [];
+                node.config[type][index][field] = value;
+            }
+        }
+
+        removeConfigParam(nodeId, type, index) {
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            node.config[type].splice(index, 1);
+
+            if (type === 'pathParams') this.renderConfigPathParams(nodeId);
+            else if (type === 'queryParams') this.renderConfigQueryParams(nodeId);
+            else if (type === 'headers') this.renderConfigHeaders(nodeId);
+        }
+
+        updateConfigExtract(nodeId, index, field, value) {
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            if (!node.config.extract) node.config.extract = [];
+            node.config.extract[index][field] = value;
+        }
+
+        removeConfigExtract(nodeId, index) {
+            const node = this.flowNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            node.config.extract.splice(index, 1);
+            this.renderConfigExtract(nodeId);
+        }
+
+        saveNodeConfig(nodeId) {
+            this.saveFlow();
+            this.eventBus.emit('ui:notification', {
+                message: 'Node configuration saved'
             });
         }
 
