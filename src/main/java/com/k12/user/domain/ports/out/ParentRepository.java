@@ -7,6 +7,7 @@ import com.k12.user.domain.models.specialization.parent.ParentId;
 import com.k12.user.domain.models.specialization.parent.ParentStatus;
 import java.util.Optional;
 import java.util.Set;
+import org.jooq.DSLContext;
 
 /**
  * Repository interface for Parent aggregates.
@@ -20,6 +21,16 @@ public interface ParentRepository {
      * @return The saved parent
      */
     Parent save(Parent parent);
+
+    /**
+     * Saves a parent aggregate using a specific DSLContext.
+     * This overload supports multi-repository transactions.
+     *
+     * @param parent the parent to save
+     * @param ctx the DSLContext to use (must be transactional)
+     * @return the saved parent
+     */
+    Parent save(Parent parent, DSLContext ctx);
 
     /**
      * Finds a parent by ID.

@@ -4,6 +4,7 @@ import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
 import com.k12.user.domain.models.User;
 import java.util.Optional;
+import org.jooq.DSLContext;
 
 /**
  * Repository interface for User aggregates.
@@ -14,6 +15,16 @@ public interface UserRepository {
      * Saves a user aggregate.
      */
     User save(User user);
+
+    /**
+     * Saves a user aggregate using a specific DSLContext.
+     * This overload supports multi-repository transactions.
+     *
+     * @param user the user to save
+     * @param ctx the DSLContext to use (must be transactional)
+     * @return the saved user
+     */
+    User save(User user, DSLContext ctx);
 
     /**
      * Finds a user by ID.

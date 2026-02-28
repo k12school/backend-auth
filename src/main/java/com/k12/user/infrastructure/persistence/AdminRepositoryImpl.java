@@ -47,27 +47,9 @@ public class AdminRepositoryImpl implements AdminRepository {
 
         try (var scope = span.makeCurrent()) {
             DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
-
-            String permissions =
-                    admin.permissions().stream().map(Permission::name).collect(Collectors.joining(","));
-
-            OffsetDateTime createdAt = OffsetDateTime.ofInstant(admin.createdAt(), ZoneOffset.UTC);
-
-            ctx.insertInto(
-                            DSL.table(ADMINS_TABLE),
-                            DSL.field("user_id"),
-                            DSL.field("permissions"),
-                            DSL.field("status"),
-                            DSL.field("created_at"))
-                    .values(admin.adminId().userId().value(), permissions, "ACTIVE", createdAt)
-                    .onConflict(DSL.field("user_id"))
-                    .doUpdate()
-                    .set(DSL.field("permissions"), permissions)
-                    .set(DSL.field("updated_at"), OffsetDateTime.now())
-                    .execute();
-
+            Admin result = saveWithContext(admin, ctx);
             span.setStatus(io.opentelemetry.api.trace.StatusCode.OK);
-            return admin;
+            return result;
         } catch (Exception e) {
             span.recordException(e);
             span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, e.getMessage());
@@ -75,6 +57,32 @@ public class AdminRepositoryImpl implements AdminRepository {
         } finally {
             span.end();
         }
+    }
+
+    @Override
+    public Admin save(Admin admin, DSLContext ctx) {
+        return saveWithContext(admin, ctx);
+    }
+
+    private Admin saveWithContext(Admin admin, DSLContext ctx) {
+        String permissions = admin.permissions().stream().map(Permission::name).collect(Collectors.joining(","));
+
+        OffsetDateTime createdAt = OffsetDateTime.ofInstant(admin.createdAt(), ZoneOffset.UTC);
+
+        ctx.insertInto(
+                        DSL.table(ADMINS_TABLE),
+                        DSL.field("user_id"),
+                        DSL.field("permissions"),
+                        DSL.field("status"),
+                        DSL.field("created_at"))
+                .values(admin.adminId().userId().value(), permissions, "ACTIVE", createdAt)
+                .onConflict(DSL.field("user_id"))
+                .doUpdate()
+                .set(DSL.field("permissions"), permissions)
+                .set(DSL.field("updated_at"), OffsetDateTime.now())
+                .execute();
+
+        return admin;
     }
 
     @Override

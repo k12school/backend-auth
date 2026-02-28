@@ -6,6 +6,7 @@ import com.k12.user.domain.models.specialization.teacher.Teacher;
 import com.k12.user.domain.models.specialization.teacher.TeacherId;
 import java.util.Optional;
 import java.util.Set;
+import org.jooq.DSLContext;
 
 /**
  * Repository interface for Teacher aggregates.
@@ -19,6 +20,16 @@ public interface TeacherRepository {
      * @return The saved teacher
      */
     Teacher save(Teacher teacher);
+
+    /**
+     * Saves a teacher aggregate using a specific DSLContext.
+     * This overload supports multi-repository transactions.
+     *
+     * @param teacher the teacher to save
+     * @param ctx the DSLContext to use (must be transactional)
+     * @return the saved teacher
+     */
+    Teacher save(Teacher teacher, DSLContext ctx);
 
     /**
      * Finds a teacher by ID.

@@ -8,6 +8,7 @@ import com.k12.user.domain.models.specialization.student.Student;
 import com.k12.user.domain.models.specialization.student.StudentStatus;
 import java.util.Optional;
 import java.util.Set;
+import org.jooq.DSLContext;
 
 /**
  * Repository interface for Student aggregates.
@@ -21,6 +22,16 @@ public interface StudentRepository {
      * @return The saved student
      */
     Student save(Student student);
+
+    /**
+     * Saves a student aggregate using a specific DSLContext.
+     * This overload supports multi-repository transactions.
+     *
+     * @param student the student to save
+     * @param ctx the DSLContext to use (must be transactional)
+     * @return the saved student
+     */
+    Student save(Student student, DSLContext ctx);
 
     /**
      * Finds a student by ID.

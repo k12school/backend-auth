@@ -12,6 +12,7 @@ import com.k12.user.domain.ports.out.ParentRepository;
 import com.k12.user.domain.ports.out.StudentRepository;
 import com.k12.user.domain.ports.out.TeacherRepository;
 import com.k12.user.domain.ports.out.UserRepository;
+import com.k12.user.infrastructure.persistence.TransactionalContext;
 import com.k12.user.infrastructure.rest.dto.ChangeRoleRequest;
 import com.k12.user.infrastructure.rest.dto.CreateUserRequest;
 import com.k12.user.infrastructure.rest.dto.UpdateUserRequest;
@@ -20,6 +21,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jooq.DSLContext;
 
 @ApplicationScoped
 @RequiredArgsConstructor
@@ -36,9 +38,13 @@ public class UserService {
     private final ParentRepository parentRepository;
     private final StudentRepository studentRepository;
     private final AdminRepository adminRepository;
+    private final TransactionalContext transactionalContext;
 
     @Transactional
     public Result<UserResponse, UserError> createUser(CreateUserRequest request) {
+        // Get shared transaction context
+        DSLContext ctx = transactionalContext.getContext();
+
         // Check email uniqueness
         var existingUser = userRepository.findByEmailAddress(request.email());
         if (existingUser.isPresent()) {
@@ -69,33 +75,33 @@ public class UserService {
         var user = com.k12.user.domain.models.UserReconstructor.applyEvent(null, userCreatedEvent);
 
         // Save user FIRST (required for foreign key constraints)
-        userRepository.save(user);
+        userRepository.save(user, ctx);
 
         // Create specialization based on role (user must exist first)
         switch (request.role().value()) {
-            case "TEACHER" -> createTeacher(userId, request.teacherData());
-            case "PARENT" -> createParent(userId, request.parentData());
-            case "STUDENT" -> createStudent(userId, request.studentData());
-            case "ADMIN" -> createAdmin(userId);
+            case "TEACHER" -> createTeacher(userId, request.teacherData(), ctx);
+            case "PARENT" -> createParent(userId, request.parentData(), ctx);
+            case "STUDENT" -> createStudent(userId, request.studentData(), ctx);
+            case "ADMIN" -> createAdmin(userId, ctx);
         }
 
         // Build response
         return Result.success(buildUserResponse(user, request));
     }
 
-    private void createTeacher(UserId userId, CreateUserRequest.TeacherData data) {
+    private void createTeacher(UserId userId, CreateUserRequest.TeacherData data, DSLContext ctx) {
         var teacher = com.k12.user.domain.models.specialization.teacher.TeacherFactory.create(
                 userId, data.employeeId(), data.department(), java.time.LocalDate.parse(data.hireDate()));
-        teacherRepository.save(teacher);
+        teacherRepository.save(teacher, ctx);
     }
 
-    private void createParent(UserId userId, CreateUserRequest.ParentData data) {
+    private void createParent(UserId userId, CreateUserRequest.ParentData data, DSLContext ctx) {
         var parent = com.k12.user.domain.models.specialization.parent.ParentFactory.create(
                 userId, data.phoneNumber(), data.address(), data.emergencyContact());
-        parentRepository.save(parent);
+        parentRepository.save(parent, ctx);
     }
 
-    private void createStudent(UserId userId, CreateUserRequest.StudentData data) {
+    private void createStudent(UserId userId, CreateUserRequest.StudentData data, DSLContext ctx) {
         var guardianId = data.guardianId() != null
                 ? new com.k12.user.domain.models.specialization.parent.ParentId(
                         new com.k12.common.domain.model.UserId(java.util.UUID.fromString(data.guardianId())))
@@ -107,15 +113,15 @@ public class UserService {
                 data.gradeLevel(),
                 java.time.LocalDate.parse(data.dateOfBirth()),
                 guardianId);
-        studentRepository.save(student);
+        studentRepository.save(student, ctx);
     }
 
-    private void createAdmin(UserId userId) {
+    private void createAdmin(UserId userId, DSLContext ctx) {
         var admin = com.k12.user.domain.models.specialization.admin.AdminFactory.create(
                 new com.k12.user.domain.models.specialization.admin.AdminId(userId),
                 java.util.Set.of(
                         com.k12.user.domain.models.specialization.admin.valueobjects.Permission.USER_MANAGEMENT));
-        adminRepository.save(admin);
+        adminRepository.save(admin, ctx);
     }
 
     private UserResponse buildUserResponse(User user, CreateUserRequest request) {

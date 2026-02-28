@@ -28,7 +28,15 @@ public class TeacherRepositoryImpl implements TeacherRepository {
     @Transactional
     public Teacher save(Teacher teacher) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        return saveWithContext(teacher, ctx);
+    }
 
+    @Override
+    public Teacher save(Teacher teacher, DSLContext ctx) {
+        return saveWithContext(teacher, ctx);
+    }
+
+    private Teacher saveWithContext(Teacher teacher, DSLContext ctx) {
         ctx.insertInto(
                         TEACHERS,
                         TEACHERS.USER_ID,

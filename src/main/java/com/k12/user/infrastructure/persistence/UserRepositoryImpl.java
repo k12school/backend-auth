@@ -50,6 +50,15 @@ public class UserRepositoryImpl implements UserRepository {
     @Transactional
     public User save(User user) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        return saveWithContext(user, ctx);
+    }
+
+    @Override
+    public User save(User user, DSLContext ctx) {
+        return saveWithContext(user, ctx);
+    }
+
+    private User saveWithContext(User user, DSLContext ctx) {
 
         try {
             // Convert immutable Set to HashSet for Kryo serialization

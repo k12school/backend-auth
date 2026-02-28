@@ -34,7 +34,15 @@ public class StudentRepositoryImpl implements StudentRepository {
     @Transactional
     public Student save(Student student) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        return saveWithContext(student, ctx);
+    }
 
+    @Override
+    public Student save(Student student, DSLContext ctx) {
+        return saveWithContext(student, ctx);
+    }
+
+    private Student saveWithContext(Student student, DSLContext ctx) {
         UUID guardianIdValue =
                 student.guardianId() != null ? student.guardianId().id() : null;
 

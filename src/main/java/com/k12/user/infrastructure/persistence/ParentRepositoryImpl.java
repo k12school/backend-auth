@@ -31,7 +31,15 @@ public class ParentRepositoryImpl implements ParentRepository {
     @Transactional
     public Parent save(Parent parent) {
         DSLContext ctx = DSL.using(dataSource, SQLDialect.POSTGRES);
+        return saveWithContext(parent, ctx);
+    }
 
+    @Override
+    public Parent save(Parent parent, DSLContext ctx) {
+        return saveWithContext(parent, ctx);
+    }
+
+    private Parent saveWithContext(Parent parent, DSLContext ctx) {
         ctx.insertInto(
                         PARENTS,
                         PARENTS.USER_ID,

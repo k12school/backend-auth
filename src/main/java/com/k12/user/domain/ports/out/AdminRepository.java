@@ -6,6 +6,7 @@ import com.k12.user.domain.models.specialization.admin.AdminId;
 import com.k12.user.domain.models.specialization.admin.AdminStatus;
 import java.util.Optional;
 import java.util.Set;
+import org.jooq.DSLContext;
 
 /**
  * Repository interface for Admin aggregates.
@@ -19,6 +20,16 @@ public interface AdminRepository {
      * @return The saved admin
      */
     Admin save(Admin admin);
+
+    /**
+     * Saves an admin aggregate using a specific DSLContext.
+     * This overload supports multi-repository transactions.
+     *
+     * @param admin the admin to save
+     * @param ctx the DSLContext to use (must be transactional)
+     * @return the saved admin
+     */
+    Admin save(Admin admin, DSLContext ctx);
 
     /**
      * Finds an admin by ID.
