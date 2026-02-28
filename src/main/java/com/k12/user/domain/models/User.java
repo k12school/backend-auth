@@ -11,6 +11,7 @@ import static com.k12.user.domain.models.error.UserError.UserStatusError.USER_AL
 import static java.time.Instant.now;
 
 import com.k12.common.domain.model.Result;
+import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
 import com.k12.user.domain.models.commands.UserCommands;
 import com.k12.user.domain.models.commands.UserCommands.ActivateUser;
@@ -38,7 +39,8 @@ public record User(
         @With PasswordHash passwordHash,
         @With Set<UserRole> userRole,
         @With UserStatus status,
-        @With UserName name) {
+        @With UserName name,
+        @With TenantId tenantId) {
 
     public Result<UserEvents, UserError> process(UserCommands command) {
         return switch (command) {

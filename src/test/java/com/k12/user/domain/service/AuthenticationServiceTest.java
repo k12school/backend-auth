@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.k12.common.domain.model.Result;
+import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
 import com.k12.user.domain.error.AuthenticationError;
 import com.k12.user.domain.models.*;
@@ -28,7 +29,8 @@ class AuthenticationServiceTest {
                 new PasswordHash("$2a$12$BEtjQc8Tux4yCcAUflElgOWwgtWjeQFThnfijfp46HbZYc6N3MAoe"),
                 Set.of(UserRole.SUPER_ADMIN),
                 UserStatus.ACTIVE,
-                new UserName("Admin User"));
+                new UserName("Admin User"),
+                TenantId.generate());
     }
 
     @Test
@@ -64,7 +66,8 @@ class AuthenticationServiceTest {
                 activeUser.passwordHash(),
                 activeUser.userRole(),
                 UserStatus.SUSPENDED,
-                activeUser.name());
+                activeUser.name(),
+                activeUser.tenantId());
         when(userRepository.findByEmailAddress("admin@k12.com")).thenReturn(Optional.of(suspendedUser));
         Result<User, AuthenticationError> result = authenticationService.authenticate("admin@k12.com", "password");
         assertTrue(result.isFailure());

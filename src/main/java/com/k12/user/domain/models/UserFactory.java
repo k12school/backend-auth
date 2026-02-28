@@ -6,6 +6,7 @@ import static com.k12.user.domain.models.error.UserError.PasswordError.PASSWORD_
 import static com.k12.user.domain.models.error.UserError.RoleError.ROLES_CANNOT_BE_EMPTY;
 
 import com.k12.common.domain.model.Result;
+import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
 import com.k12.user.domain.models.commands.UserCommands.CreateUser;
 import com.k12.user.domain.models.error.UserError;
@@ -78,7 +79,9 @@ public final class UserFactory {
      * @param roles User's roles (must have at least one)
      * @param name Validated user name
      * @return Result containing UserCreated event on success, or UserError on failure
+     * @deprecated Use {@link #create(EmailAddress, PasswordHash, Set, UserName, TenantId)} instead
      */
+    @Deprecated
     public static Result<UserEvents, UserError> create(
             EmailAddress emailAddress, PasswordHash passwordHash, Set<UserRole> roles, UserName name) {
 
@@ -90,9 +93,42 @@ public final class UserFactory {
         java.time.Instant now = java.time.Instant.now();
         long version = 1L;
 
-        User user = new User(userId, emailAddress, passwordHash, roles, UserStatus.ACTIVE, name);
+        // Generate default tenant for backward compatibility
+        TenantId tenantId = TenantId.generate();
+
+        User user = new User(userId, emailAddress, passwordHash, roles, UserStatus.ACTIVE, name, tenantId);
 
         return Result.success(new UserEvents.UserCreated(
-                userId, emailAddress, passwordHash, roles, UserStatus.ACTIVE, name, now, version));
+                userId, emailAddress, passwordHash, roles, UserStatus.ACTIVE, name, tenantId, now, version));
+    }
+
+    /**
+     * Creates a new user from already validated value objects with tenant association.
+     * Use this when you already have validated inputs.
+     *
+     * @param emailAddress Validated email address
+     * @param passwordHash Validated password hash
+     * @param roles User's roles (must have at least one)
+     * @param name Validated user name
+     * @param tenantId Tenant identifier
+     * @return Result containing UserCreated event on success, or UserError on failure
+     */
+    public static Result<UserEvents, UserError> create(
+            EmailAddress emailAddress,
+            PasswordHash passwordHash,
+            Set<UserRole> roles,
+            UserName name,
+            TenantId tenantId) {
+
+        if (roles == null || roles.isEmpty()) {
+            return Result.failure(ROLES_CANNOT_BE_EMPTY);
+        }
+
+        UserId userId = UserId.generate();
+        java.time.Instant now = java.time.Instant.now();
+        long version = 1L;
+
+        return Result.success(new UserEvents.UserCreated(
+                userId, emailAddress, passwordHash, roles, UserStatus.ACTIVE, name, tenantId, now, version));
     }
 }

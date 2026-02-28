@@ -1,5 +1,6 @@
 package com.k12.user.domain.models.events;
 
+import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
 import com.k12.user.domain.models.EmailAddress;
 import com.k12.user.domain.models.PasswordHash;
@@ -35,6 +36,7 @@ public sealed interface UserEvents
             Set<UserRole> roles,
             UserStatus status,
             UserName name,
+            TenantId tenantId,
             Instant createdAt,
             long version)
             implements UserEvents {}

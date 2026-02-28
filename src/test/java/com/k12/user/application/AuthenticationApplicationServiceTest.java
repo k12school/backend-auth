@@ -57,6 +57,7 @@ class AuthenticationApplicationServiceTest {
                         "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU9bK8fk.5qS"),
                 Set.of(com.k12.user.domain.models.UserRole.SUPER_ADMIN),
                 com.k12.user.domain.models.UserStatus.ACTIVE,
-                new com.k12.user.domain.models.UserName("Admin"));
+                new com.k12.user.domain.models.UserName("Admin"),
+                new com.k12.common.domain.model.TenantId("default-tenant"));
     }
 }

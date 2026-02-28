@@ -2,6 +2,7 @@ package com.k12.user.infrastructure.security;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
 import com.k12.user.domain.models.*;
 import java.util.Base64;
@@ -28,7 +29,8 @@ public class TokenGenerationVerificationTest {
                 new PasswordHash("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"),
                 Set.of(UserRole.SUPER_ADMIN),
                 UserStatus.ACTIVE,
-                new UserName("System Administrator"));
+                new UserName("System Administrator"),
+                TenantId.generate());
 
         // Generate token
         String token = TokenService.generateToken(user, "default-tenant");

@@ -1,6 +1,7 @@
 package com.k12.user.domain.models;
 
 import com.k12.common.domain.model.Result;
+import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
 import com.k12.user.domain.models.error.UserError;
 import com.k12.user.domain.models.events.UserEvents;
@@ -130,8 +131,9 @@ public final class UserReconstructor {
                     var roles,
                     var status,
                     var name,
+                    TenantId tenantId,
                     var createdAt,
-                    var version) -> new User(userId, email, passwordHash, roles, status, name);
+                    var version) -> new User(userId, email, passwordHash, roles, status, name, tenantId);
 
             // UserSuspended: Changes status to SUSPENDED
             case UserEvents.UserSuspended(var userId, var suspendedAt, var version)
@@ -191,6 +193,7 @@ public final class UserReconstructor {
                     var roles,
                     var status,
                     var name,
+                    var tenantId,
                     var createdAt,
                     var version) -> userId;
             case UserEvents.UserSuspended(var userId, var suspendedAt, var version) -> userId;
@@ -217,6 +220,7 @@ public final class UserReconstructor {
                     var roles,
                     var status,
                     var name,
+                    var tenantId,
                     var createdAt,
                     long version) -> version;
             case UserEvents.UserSuspended(var userId, var suspendedAt, long version) -> version;

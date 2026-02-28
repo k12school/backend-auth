@@ -125,7 +125,13 @@ public class TenantAdminService {
 
             // Step 6: Save User with tenant association
             User user = new User(
-                    userId, emailAddress, passwordHash, Set.of(UserRole.ADMIN), userCreated.status(), userName);
+                    userId,
+                    emailAddress,
+                    passwordHash,
+                    Set.of(UserRole.ADMIN),
+                    userCreated.status(),
+                    userName,
+                    tenantId);
             userRepository.save(user);
 
             // Step 7: Create Admin aggregate

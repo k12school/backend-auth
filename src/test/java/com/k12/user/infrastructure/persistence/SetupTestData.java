@@ -118,6 +118,7 @@ public class SetupTestData {
                 new HashSet<>(java.util.Set.of(UserRole.SUPER_ADMIN)),
                 UserStatus.ACTIVE,
                 new UserName("Super Administrator"),
+                new com.k12.common.domain.model.TenantId("default-tenant"),
                 Instant.now(),
                 1L);
 

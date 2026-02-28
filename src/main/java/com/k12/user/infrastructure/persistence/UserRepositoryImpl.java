@@ -5,6 +5,7 @@ import static com.k12.backend.infrastructure.jooq.public_.tables.Users.USERS;
 
 import com.k12.backend.infrastructure.jooq.public_.tables.records.UserEventsRecord;
 import com.k12.common.domain.model.Result;
+import com.k12.common.domain.model.TenantId;
 import com.k12.common.domain.model.UserId;
 import com.k12.tenant.infrastructure.persistence.KryoEventSerializer;
 import com.k12.tenant.infrastructure.persistence.KryoEventSerializer.SerializationException;
@@ -62,6 +63,7 @@ public class UserRepositoryImpl implements UserRepository {
                     roles,
                     user.status(),
                     user.name(),
+                    user.tenantId(),
                     Instant.now(),
                     1L);
 
@@ -163,7 +165,8 @@ public class UserRepositoryImpl implements UserRepository {
                     new PasswordHash(record.getPasswordHash()),
                     parseRoles(record.getRoles()),
                     UserStatus.valueOf(record.getStatus()),
-                    UserName.of(record.getName()));
+                    UserName.of(record.getName()),
+                    TenantId.generate()); // Default tenant for legacy users
             return Optional.of(user);
         } catch (Exception e) {
             return Optional.empty();
